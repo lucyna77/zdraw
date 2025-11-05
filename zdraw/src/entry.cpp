@@ -583,7 +583,7 @@ namespace nmenu {
 						static int key = 0;
 						zui::keybind( "keybind", key );
 
-						static int current_theme = 1;
+						static int current_theme = 4;
 						constexpr const char* theme_names[ ] = { "dark blue", "light pink", "mint", "dark white", "lavender", "peach", "sky" };
 
 						if ( zui::combo( "theme", current_theme, theme_names, 7 ) )
