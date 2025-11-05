@@ -537,23 +537,37 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, PWSTR, int )
 
 		zdraw::begin_frame( );
 		{
-			nbench::frame( static_cast< float >( g_app.m_width ), static_cast< float >( g_app.m_height ) );
-
-			zui::begin_frame( );
+			zui::update( );
 
 			if ( zui::begin_window( "main", g_main_x, g_main_y, 420.0f, 280.0f ) )
 			{
-				const auto current_content_region = zui::get_content_region_avail( );
+				const auto main_region = zui::get_content_region_avail( );
 
-				if ( zui::begin_nested_window( "content", current_content_region.first, current_content_region.second ) )
+				if ( zui::begin_nested_window( "content", main_region.first, main_region.second ) )
 				{
+					const auto content_region = zui::get_content_region_avail( );
+
+					if ( zui::button( "testbutton", content_region.first, 50 ) )
+					{
+
+					}
+
+					static bool test_checkbox{ true };
+					zui::checkbox( "testbox", test_checkbox );
+
+					static float test_slider{ 0.5f };
+					zui::slider_float( "testslider", test_slider, 0.0f, 1.0f );
+
+					static int keybind_index{ 0 };
+					zui::keybind( "key", keybind_index );
+
 					zui::end_nested_window( );
 				}
 
 				zui::end_window( );
 			}
 
-			zui::end_frame( );
+			//nbench::frame( static_cast< float >( g_app.m_width ), static_cast< float >( g_app.m_height ) );
 		}
 		zdraw::end_frame( );
 

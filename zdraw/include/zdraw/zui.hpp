@@ -1,80 +1,126 @@
 #ifndef ZUI_HPP
 #define ZUI_HPP
 
-namespace zui {
+#include <include/zdraw/zdraw.hpp>
 
-    struct rect
-    {
-        float m_x{ 0.0f };
-        float m_y{ 0.0f };
-        float m_w{ 0.0f };
-        float m_h{ 0.0f };
-    };
+namespace zui
+{
+	struct rect
+	{
+		float m_x{ 0.0f };
+		float m_y{ 0.0f };
+		float m_w{ 0.0f };
+		float m_h{ 0.0f };
+	};
 
-    struct style
-    {
-        float WindowPaddingX{ 8.0f };
-        float WindowPaddingY{ 8.0f };
-        float ItemSpacingX{ 8.0f };
-        float ItemSpacingY{ 4.0f };
-        float FramePaddingX{ 6.0f };
-        float FramePaddingY{ 3.0f };
-        float WindowRounding{ 0.0f };
-        float BorderThickness{ 1.0f };
+	struct style
+	{
+		float window_padding_x{ 8.0f };
+		float window_padding_y{ 8.0f };
+		float item_spacing_x{ 8.0f };
+		float item_spacing_y{ 8.0f };
+		float frame_padding_x{ 6.0f };
+		float frame_padding_y{ 3.0f };
+		float window_rounding{ 0.0f };
+		float border_thickness{ 1.0f };
+		float checkbox_size{ 16.0f };
+		float slider_height{ 10.0f };
+		float keybind_height{ 18.0f };
 
-        zdraw::rgba WindowBg{ 22, 22, 22, 220 };
-        zdraw::rgba WindowBorder{ 60, 60, 60, 255 };
+		zdraw::rgba window_bg{ 18, 18, 22, 255 };
+		zdraw::rgba window_border{ 65, 75, 95, 255 };
+		zdraw::rgba nested_bg{ 24, 24, 30, 255 };
+		zdraw::rgba nested_border{ 75, 85, 105, 255 };
 
-        zdraw::rgba NestedBg{ 28, 28, 28, 220 };
-        zdraw::rgba NestedBorder{ 70, 70, 70, 255 };
-    };
+		zdraw::rgba checkbox_bg{ 30, 32, 38, 255 };
+		zdraw::rgba checkbox_border{ 70, 80, 100, 255 };
+		zdraw::rgba checkbox_check{ 145, 160, 210, 255 };
 
-    enum class style_var
-    {
-        WindowPaddingX,
-        WindowPaddingY,
-        ItemSpacingX,
-        ItemSpacingY,
-        FramePaddingX,
-        FramePaddingY,
-        WindowRounding,
-        BorderThickness
-    };
+		zdraw::rgba slider_bg{ 30, 32, 38, 255 };
+		zdraw::rgba slider_border{ 70, 80, 100, 255 };
+		zdraw::rgba slider_fill{ 145, 160, 210, 255 };
+		zdraw::rgba slider_grab{ 165, 180, 230, 255 };
+		zdraw::rgba slider_grab_active{ 185, 200, 240, 255 };
 
-    enum class style_color
-    {
-        WindowBg,
-        WindowBorder,
-        ChildBg,
-        ChildBorder,
-        NestedBg,
-        NestedBorder
-    };
+		zdraw::rgba button_bg{ 40, 45, 60, 255 };
+		zdraw::rgba button_border{ 85, 95, 120, 255 };
+		zdraw::rgba button_hovered{ 55, 60, 80, 255 };
+		zdraw::rgba button_active{ 30, 35, 50, 255 };
 
-    bool initialize( HWND hwnd ) noexcept;
-    void shutdown( ) noexcept;
+		zdraw::rgba keybind_bg{ 30, 32, 38, 255 };
+		zdraw::rgba keybind_border{ 70, 80, 100, 255 };
+		zdraw::rgba keybind_waiting{ 145, 160, 210, 255 };
 
-    void begin_frame( ) noexcept;
-    void end_frame( ) noexcept;
+		zdraw::rgba text{ 235, 240, 245, 255 };
+	};
 
-    bool begin_window( std::string_view title, float& x, float& y, float w, float h ) noexcept;
-    void end_window( ) noexcept;
+	enum class style_var
+	{
+		window_padding_x,
+		window_padding_y,
+		item_spacing_x,
+		item_spacing_y,
+		frame_padding_x,
+		frame_padding_y,
+		window_rounding,
+		border_thickness,
+		checkbox_size,
+		slider_height,
+		keybind_height
+	};
 
-    bool begin_nested_window( std::string_view title, float w, float h ) noexcept;
-    void end_nested_window( ) noexcept;
+	enum class style_color
+	{
+		window_bg,
+		window_border,
+		nested_bg,
+		nested_border,
+		checkbox_bg,
+		checkbox_border,
+		checkbox_check,
+		slider_bg,
+		slider_border,
+		slider_fill,
+		slider_grab,
+		slider_grab_active,
+		button_bg,
+		button_border,
+		button_hovered,
+		button_active,
+		keybind_bg,
+		keybind_border,
+		keybind_waiting,
+		text
+	};
 
-    std::pair<float, float> get_cursor_pos( ) noexcept;
-    void set_cursor_pos( float x, float y ) noexcept;
+	bool initialize( HWND hwnd );
+	void update( );
 
-    std::pair<float, float> get_content_region_avail( ) noexcept;
-    style& get_style( ) noexcept;
+	bool begin_window( std::string_view title, float& x, float& y, float w, float h );
+	void end_window( );
 
-    void push_style_var( style_var var, float value ) noexcept;
-    void pop_style_var( int count = 1 ) noexcept;
+	bool begin_nested_window( std::string_view title, float w, float h );
+	void end_nested_window( );
 
-    void push_style_color( style_color idx, const zdraw::rgba& col ) noexcept;
-    void pop_style_color( int count = 1 ) noexcept;
+	std::pair<float, float> get_cursor_pos( );
+	void set_cursor_pos( float x, float y );
 
-} // namespace zui
+	std::pair<float, float> get_content_region_avail( );
+
+	style& get_style( );
+
+	void push_style_var( style_var var, float value );
+	void pop_style_var( int count = 1 );
+
+	void push_style_color( style_color idx, const zdraw::rgba& col );
+	void pop_style_color( int count = 1 );
+
+	bool checkbox( std::string_view label, bool& v );
+	bool button( std::string_view label, float w, float h );
+	bool keybind( std::string_view label, int& key );
+
+	bool slider_float( std::string_view label, float& v, float v_min, float v_max, std::string_view format = "%.3f" );
+	bool slider_int( std::string_view label, int& v, int v_min, int v_max );
+}
 
 #endif // !ZUI_HPP
