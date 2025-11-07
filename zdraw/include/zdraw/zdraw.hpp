@@ -229,7 +229,7 @@ namespace zdraw
 		void clear_caches( ) const noexcept;
 	};
 
-	namespace text_styles
+	namespace tstyles
 	{
 		struct normal { };
 		struct outlined { };
@@ -269,49 +269,37 @@ namespace zdraw
 	void circle( float x, float y, float radius, rgba color, int segments = 32, float thickness = 1.0f );
 	void circle_filled( float x, float y, float radius, rgba color, int segments = 32 );
 
-	template <typename Style = text_styles::normal>
+	template <typename style = tstyles::normal>
 	void text( float x, float y, std::string_view str, rgba color, const font* fnt = nullptr )
 	{
 		const font* f{ fnt != nullptr ? fnt : get_font( ) };
 
-		if constexpr ( std::is_same_v<Style, text_styles::normal> )
+		if constexpr ( std::is_same_v<style, tstyles::normal> )
 		{
 			get_draw_list( ).add_text( x, y, str, f, color );
 		}
-		else if constexpr ( std::is_same_v<Style, text_styles::outlined> )
+		else if constexpr ( std::is_same_v<style, tstyles::outlined> )
 		{
 			constexpr float offsets[ 8 ][ 2 ]{ {-1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, -1.0f}, {0.0f, 1.0f}, {-1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f} };
-			constexpr rgba shadow_col{ 0, 0, 0, 235 };
 
 			for ( int i{ 0 }; i < 8; ++i )
 			{
-				get_draw_list( ).add_text( x + offsets[ i ][ 0 ], y + offsets[ i ][ 1 ], str, f, shadow_col );
+				get_draw_list( ).add_text( x + offsets[ i ][ 0 ], y + offsets[ i ][ 1 ], str, f, rgba( 0, 0, 0, 235) );
 			}
 
 			get_draw_list( ).add_text( x, y, str, f, color );
 		}
-		else if constexpr ( std::is_same_v<Style, text_styles::shadowed> )
+		else if constexpr ( std::is_same_v<style, tstyles::shadowed> )
 		{
-			constexpr auto shadow_offset{ 1.0f };
-			constexpr rgba shadow_col{ 0, 0, 0, 235 };
+			constexpr float offset{ 1.0f };
 
-			get_draw_list( ).add_text( x + shadow_offset, y + shadow_offset, str, f, shadow_col );
+			get_draw_list( ).add_text( x + offset, y + offset, str, f, rgba( 0, 0, 0, 235 ) );
 			get_draw_list( ).add_text( x, y, str, f, color );
 		}
 		else
 		{
 			get_draw_list( ).add_text( x, y, str, f, color );
 		}
-	}
-
-	inline void text_outlined( float x, float y, std::string_view str, rgba color, const font* fnt = nullptr )
-	{
-		text<text_styles::outlined>( x, y, str, color, fnt );
-	}
-
-	inline void text_shadowed( float x, float y, std::string_view str, rgba color, const font* fnt = nullptr )
-	{
-		text<text_styles::shadowed>( x, y, str, color, fnt );
 	}
 
 	[[nodiscard]] std::pair<float, float> measure_text( std::string_view text, const font* fnt = nullptr );

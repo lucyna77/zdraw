@@ -60,6 +60,7 @@ namespace zui {
 			std::vector<std::uintptr_t> m_id_stack{};
 
 			std::uintptr_t m_active_window_id{ 0 };
+			std::uintptr_t m_active_resize_id{ 0 };
 			std::uintptr_t m_active_slider_id{ 0 };
 			std::uintptr_t m_active_keybind_id{ 0 };
 
@@ -351,22 +352,47 @@ namespace zui {
 		if ( detail::g_ctx.m_input.m_released )
 		{
 			detail::g_ctx.m_active_window_id = 0;
+			detail::g_ctx.m_active_resize_id = 0;
 			detail::g_ctx.m_active_slider_id = 0;
 		}
 	}
 
-	bool begin_window( std::string_view title, float& x, float& y, float w, float h )
+	bool begin_window( std::string_view title, float& x, float& y, float& w, float& h, bool resizable, float min_w, float min_h )
 	{
 		const auto id = detail::hash_str( title );
 		auto abs = rect{ x, y, w, h };
-		const auto hovered = detail::mouse_in_rect( abs );
 
-		if ( hovered && detail::g_ctx.m_input.m_clicked && detail::g_ctx.m_active_window_id == 0 && detail::g_ctx.m_active_slider_id == 0 )
+		constexpr auto grip_size = 16.0f;
+		const auto grip_rect = rect{ abs.m_x + abs.m_w - grip_size,abs.m_y + abs.m_h - grip_size,grip_size,grip_size };
+
+		const auto grip_hovered = resizable && detail::mouse_in_rect( grip_rect );
+		const auto window_hovered = detail::mouse_in_rect( abs );
+
+		if ( grip_hovered && detail::g_ctx.m_input.m_clicked && detail::g_ctx.m_active_resize_id == 0 )
+		{
+			detail::g_ctx.m_active_resize_id = id;
+		}
+
+		if ( detail::g_ctx.m_active_resize_id == id && detail::g_ctx.m_input.m_down )
+		{
+			const auto dx = detail::g_ctx.m_input.m_x - detail::g_ctx.m_prev_input.m_x;
+			const auto dy = detail::g_ctx.m_input.m_y - detail::g_ctx.m_prev_input.m_y;
+
+			const auto new_w = std::max( min_w, w + dx );
+			const auto new_h = std::max( min_h, h + dy );
+
+			w = new_w;
+			h = new_h;
+
+			abs.m_w = w;
+			abs.m_h = h;
+		}
+		else if ( window_hovered && !grip_hovered && detail::g_ctx.m_input.m_clicked && detail::g_ctx.m_active_window_id == 0 && detail::g_ctx.m_active_slider_id == 0 && detail::g_ctx.m_active_resize_id == 0 )
 		{
 			detail::g_ctx.m_active_window_id = id;
 		}
 
-		if ( detail::g_ctx.m_active_window_id == id && detail::g_ctx.m_input.m_down && detail::g_ctx.m_active_slider_id == 0 )
+		if ( detail::g_ctx.m_active_window_id == id && detail::g_ctx.m_input.m_down && detail::g_ctx.m_active_slider_id == 0 && detail::g_ctx.m_active_resize_id == 0 )
 		{
 			const auto dx = detail::g_ctx.m_input.m_x - detail::g_ctx.m_prev_input.m_x;
 			const auto dy = detail::g_ctx.m_input.m_y - detail::g_ctx.m_prev_input.m_y;
@@ -384,12 +410,16 @@ namespace zui {
 		win->m_cursor_x = detail::g_ctx.m_style.window_padding_x;
 		win->m_cursor_y = detail::g_ctx.m_style.window_padding_y;
 		win->m_line_h = 0.0f;
-		win->m_last_item = { 0,0,0,0 };
+		win->m_last_item = { 0, 0, 0, 0 };
 		win->m_is_child = false;
 
-		const auto color_tl = detail::g_ctx.m_style.window_bg;
-		const auto color_br = detail::darken_color( detail::g_ctx.m_style.window_bg, 0.7f );
-		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tl, color_br, color_br );
+		const auto base_color = detail::g_ctx.m_style.window_bg;
+		const auto color_tl = detail::lighten_color( base_color, 1.15f );
+		const auto color_tr = base_color;
+		const auto color_bl = base_color;
+		const auto color_br = detail::darken_color( base_color, 0.85f );
+
+		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tr, color_br, color_bl );
 
 		if ( detail::g_ctx.m_style.border_thickness > 0.0f )
 		{
@@ -438,9 +468,13 @@ namespace zui {
 		win->m_last_item = { 0,0,0,0 };
 		win->m_is_child = false;
 
-		const auto color_tl = detail::g_ctx.m_style.nested_bg;
-		const auto color_br = detail::darken_color( detail::g_ctx.m_style.nested_bg, 0.8f );
-		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tl, color_br, color_br );
+		const auto base_color = detail::g_ctx.m_style.nested_bg;
+		const auto color_tl = detail::lighten_color( base_color, 1.15f );
+		const auto color_tr = base_color;
+		const auto color_bl = base_color;
+		const auto color_br = detail::darken_color( base_color, 0.85f );
+
+		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tr, color_br, color_bl );
 
 		if ( detail::g_ctx.m_style.border_thickness > 0.0f )
 		{
@@ -477,7 +511,6 @@ namespace zui {
 		const auto border_y = abs.m_y + title_h * 0.5f;
 
 		zdraw::rect_filled( abs.m_x, border_y, abs.m_w, abs.m_h - title_h * 0.5f, bg_col );
-		zdraw::rect( abs.m_x, border_y, abs.m_w, abs.m_h - title_h * 0.5f, border_col, thickness );
 
 		if ( !title.empty( ) )
 		{
@@ -486,13 +519,26 @@ namespace zui {
 			const auto text_y = abs.m_y;
 			const auto pad = 4.0f;
 
-			const auto gap_start = text_x - pad;
-			const auto gap_end = text_x + title_w + pad;
+			const auto border_y = std::round( abs.m_y + title_h * 0.5f );
+			const auto gap_start = std::round( text_x - pad );
+			const auto gap_end = std::round( text_x + title_w + pad );
 
-			zdraw::line( gap_start, border_y, gap_end, border_y, bg_col, thickness );
+			zdraw::rect_filled( abs.m_x, border_y - thickness * 0.5f, gap_start - abs.m_x, thickness, border_col );
+			zdraw::rect_filled( gap_end, border_y - thickness * 0.5f, abs.m_x + abs.m_w - gap_end, thickness, border_col );
+
+			zdraw::line( abs.m_x + abs.m_w, border_y, abs.m_x + abs.m_w, abs.m_y + abs.m_h, border_col, thickness );
+			zdraw::line( abs.m_x, abs.m_y + abs.m_h, abs.m_x + abs.m_w, abs.m_y + abs.m_h, border_col, thickness );
+			zdraw::line( abs.m_x, border_y, abs.m_x, abs.m_y + abs.m_h, border_col, thickness );
+
+			zdraw::rect_filled( gap_start, text_y, gap_end - gap_start, title_h, bg_col );
+			zdraw::rect( gap_start, text_y, gap_end - gap_start, title_h, border_col );
 
 			std::string title_str( title.begin( ), title.end( ) );
 			zdraw::text( text_x, text_y + 2.0f, title_str, detail::g_ctx.m_style.group_box_title_text );
+		}
+		else
+		{
+			zdraw::rect( abs.m_x, border_y, abs.m_w, abs.m_h - title_h * 0.5f, border_col, thickness );
 		}
 
 		detail::g_ctx.m_windows.emplace_back( );
@@ -922,8 +968,8 @@ namespace zui {
 					continue;
 				}
 
-				if ( 
-					vk == VK_SHIFT || vk == VK_CONTROL || 
+				if (
+					vk == VK_SHIFT || vk == VK_CONTROL ||
 					vk == VK_MENU ||
 					vk == VK_LSHIFT || vk == VK_RSHIFT ||
 					vk == VK_LCONTROL || vk == VK_RCONTROL ||
@@ -1183,37 +1229,37 @@ namespace zui {
 		switch ( preset )
 		{
 		case color_preset::dark_blue:
-			s.window_bg = { 18, 18, 22, 255 };
-			s.window_border = { 65, 75, 95, 255 };
-			s.nested_bg = { 24, 24, 30, 255 };
-			s.nested_border = { 75, 85, 105, 255 };
-			s.group_box_bg = { 26, 28, 34, 255 };
-			s.group_box_border = { 70, 80, 100, 255 };
-			s.group_box_title_text = { 200, 210, 220, 255 };
-			s.checkbox_bg = { 30, 32, 38, 255 };
-			s.checkbox_border = { 70, 80, 100, 255 };
-			s.checkbox_check = { 145, 160, 210, 255 };
-			s.slider_bg = { 30, 32, 38, 255 };
-			s.slider_border = { 70, 80, 100, 255 };
-			s.slider_fill = { 145, 160, 210, 255 };
-			s.slider_grab = { 165, 180, 230, 255 };
-			s.slider_grab_active = { 185, 200, 240, 255 };
-			s.button_bg = { 40, 45, 60, 255 };
-			s.button_border = { 85, 95, 120, 255 };
-			s.button_hovered = { 55, 60, 80, 255 };
-			s.button_active = { 30, 35, 50, 255 };
-			s.keybind_bg = { 30, 32, 38, 255 };
-			s.keybind_border = { 70, 80, 100, 255 };
-			s.keybind_waiting = { 145, 160, 210, 255 };
-			s.combo_bg = { 30, 32, 38, 255 };
-			s.combo_border = { 70, 80, 100, 255 };
-			s.combo_arrow = { 145, 160, 210, 255 };
-			s.combo_hovered = { 55, 60, 80, 255 };
-			s.combo_popup_bg = { 24, 24, 30, 255 };
-			s.combo_popup_border = { 85, 95, 120, 255 };
-			s.combo_item_hovered = { 55, 60, 80, 255 };
-			s.combo_item_selected = { 145, 160, 210, 50 };
-			s.text = { 235, 240, 245, 255 };
+			s.window_bg = { 15, 18, 25, 255 };
+			s.window_border = { 45, 60, 85, 255 };
+			s.nested_bg = { 20, 23, 30, 255 };
+			s.nested_border = { 55, 70, 95, 255 };
+			s.group_box_bg = { 22, 25, 32, 255 };
+			s.group_box_border = { 50, 65, 90, 255 };
+			s.group_box_title_text = { 180, 200, 230, 255 };
+			s.checkbox_bg = { 25, 30, 40, 255 };
+			s.checkbox_border = { 50, 65, 90, 255 };
+			s.checkbox_check = { 100, 150, 255, 255 };
+			s.slider_bg = { 25, 30, 40, 255 };
+			s.slider_border = { 50, 65, 90, 255 };
+			s.slider_fill = { 100, 150, 255, 255 };
+			s.slider_grab = { 120, 170, 255, 255 };
+			s.slider_grab_active = { 140, 190, 255, 255 };
+			s.button_bg = { 30, 40, 55, 255 };
+			s.button_border = { 60, 80, 110, 255 };
+			s.button_hovered = { 40, 50, 70, 255 };
+			s.button_active = { 25, 35, 50, 255 };
+			s.keybind_bg = { 25, 30, 40, 255 };
+			s.keybind_border = { 50, 65, 90, 255 };
+			s.keybind_waiting = { 100, 150, 255, 255 };
+			s.combo_bg = { 25, 30, 40, 255 };
+			s.combo_border = { 50, 65, 90, 255 };
+			s.combo_arrow = { 100, 150, 255, 255 };
+			s.combo_hovered = { 40, 50, 70, 255 };
+			s.combo_popup_bg = { 20, 23, 30, 255 };
+			s.combo_popup_border = { 60, 80, 110, 255 };
+			s.combo_item_hovered = { 40, 50, 70, 255 };
+			s.combo_item_selected = { 100, 150, 255, 50 };
+			s.text = { 220, 230, 245, 255 };
 			break;
 
 		case color_preset::light_pink:

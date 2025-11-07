@@ -128,7 +128,7 @@ namespace zui {
 	void begin( );
 	void end( );
 
-	bool begin_window( std::string_view title, float& x, float& y, float w, float h );
+	bool begin_window( std::string_view title, float& x, float& y, float& w, float& h, bool resizable = false, float min_w = 200.0f, float min_h = 200.0f );
 	void end_window( );
 
 	bool begin_nested_window( std::string_view title, float w, float h );

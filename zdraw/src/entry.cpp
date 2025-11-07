@@ -477,6 +477,8 @@ namespace nmenu {
 
 	static float g_main_x{ 100.0f };
 	static float g_main_y{ 100.0f };
+	static float g_main_w{ 550.0f };
+	static float g_main_h{ 500.0f };
 
 	static void draw( )
 	{
@@ -484,7 +486,7 @@ namespace nmenu {
 
 		static int tab{ 0 };
 
-		if ( zui::begin_window( "main", g_main_x, g_main_y, 550.0f, 500.0f ) )
+		if ( zui::begin_window( "main", g_main_x, g_main_y, g_main_w, g_main_h ) )
 		{
 			const auto [main_w, main_h] = zui::get_content_region_avail( );
 			const auto header_width = main_w;
