@@ -247,9 +247,13 @@ namespace zdraw
 	[[nodiscard]] Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> load_texture_from_memory( std::span<const std::byte> data, int* out_width = nullptr, int* out_height = nullptr );
 	[[nodiscard]] Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> load_texture_from_file( std::string_view filepath, int* out_width = nullptr, int* out_height = nullptr );
 
-	[[nodiscard]] font* load_font_from_memory( std::span<const std::byte> font_data, float size_pixels, int atlas_width = 512, int atlas_height = 512 );
-	[[nodiscard]] font* load_font_from_file( std::string_view filepath, float size_pixels, int atlas_width = 512, int atlas_height = 512 );
-	[[nodiscard]] font* get_normal_font( ) noexcept;
+	[[nodiscard]] font* add_font_from_memory( std::span<const std::byte> font_data, float size_pixels, int atlas_width = 512, int atlas_height = 512 );
+	[[nodiscard]] font* add_font_from_file( std::string_view filepath, float size_pixels, int atlas_width = 512, int atlas_height = 512 );
+	[[nodiscard]] font* get_font( ) noexcept; 
+	[[nodiscard]] font* get_default_font( ) noexcept;
+
+	void push_font( font* f );
+	void pop_font( );
 
 	void push_clip_rect( float x0, float y0, float x1, float y1 );
 	void pop_clip_rect( );
@@ -268,7 +272,7 @@ namespace zdraw
 	template <typename Style = text_styles::normal>
 	void text( float x, float y, std::string_view str, rgba color, const font* fnt = nullptr )
 	{
-		const font* f{ fnt != nullptr ? fnt : get_normal_font( ) };
+		const font* f{ fnt != nullptr ? fnt : get_font( ) };
 
 		if constexpr ( std::is_same_v<Style, text_styles::normal> )
 		{

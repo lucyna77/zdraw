@@ -182,8 +182,9 @@ namespace zdraw {
 			draw_list m_current_draw_list{};
 			render_state_cache m_state_cache{};
 
-			std::vector<std::unique_ptr<font>> m_loaded_fonts{};
-			font* m_normal_font{ nullptr };
+			std::vector<std::unique_ptr<font>> m_fonts{};
+			font* m_default_font{ nullptr };
+			std::vector<font*> m_font_stack{};
 
 			std::uint32_t m_frame_vertex_count{ 0 };
 			std::uint32_t m_frame_index_count{ 0 };
@@ -332,6 +333,88 @@ namespace zdraw {
 		{
 			return g_render.m_vertex_buffer.create( g_render.m_device.Get( ), g_render.k_initial_vertex_capacity, D3D11_BIND_VERTEX_BUFFER ) && g_render.m_index_buffer.create( g_render.m_device.Get( ), g_render.k_initial_index_capacity, D3D11_BIND_INDEX_BUFFER );
 		}
+
+		static font* create_font( std::span<const std::byte> font_data, float size_pixels, int atlas_width, int atlas_height )
+		{
+			auto new_font{ std::make_unique<font>( ) };
+			new_font->m_font_size = size_pixels;
+			new_font->m_atlas = std::make_shared<font_atlas>( );
+			new_font->m_atlas->m_width = atlas_width;
+			new_font->m_atlas->m_height = atlas_height;
+
+			std::vector<std::uint8_t> bitmap( static_cast< std::size_t >( atlas_width ) * static_cast< std::size_t >( atlas_height ), 0u );
+
+			new_font->m_packed_char_data = std::make_unique<stbtt_packedchar[ ]>( 95 );
+
+			stbtt_pack_context spc{};
+			if ( !stbtt_PackBegin( &spc, bitmap.data( ), atlas_width, atlas_height, 0, 1, nullptr ) ) [[unlikely]]
+			{
+				return nullptr;
+			}
+
+			stbtt_PackSetOversampling( &spc, 2, 2 );
+			stbtt_PackSetSkipMissingCodepoints( &spc, 1 );
+
+			stbtt_PackFontRange( &spc, reinterpret_cast< const unsigned char* >( font_data.data( ) ), 0, size_pixels, 32, 95, new_font->m_packed_char_data.get( ) );
+			stbtt_PackEnd( &spc );
+
+			stbtt_fontinfo info{};
+			stbtt_InitFont( &info, reinterpret_cast< const unsigned char* >( font_data.data( ) ), 0 );
+
+			int ascent{ 0 };
+			int descent{ 0 };
+			int line_gap{ 0 };
+			stbtt_GetFontVMetrics( &info, &ascent, &descent, &line_gap );
+
+			const float scale{ stbtt_ScaleForPixelHeight( &info, size_pixels ) };
+
+			new_font->m_ascent = static_cast< float >( ascent ) * scale;
+			new_font->m_descent = static_cast< float >( descent ) * scale;
+			new_font->m_line_gap = static_cast< float >( line_gap ) * scale;
+			new_font->m_line_height = new_font->m_ascent - new_font->m_descent + new_font->m_line_gap;
+
+			D3D11_TEXTURE2D_DESC tex_desc{};
+			tex_desc.Width = static_cast< UINT >( atlas_width );
+			tex_desc.Height = static_cast< UINT >( atlas_height );
+			tex_desc.MipLevels = 1;
+			tex_desc.ArraySize = 1;
+			tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			tex_desc.SampleDesc.Count = 1;
+			tex_desc.Usage = D3D11_USAGE_IMMUTABLE;
+			tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+			std::vector<std::uint8_t> rgba_bitmap( static_cast< std::size_t >( atlas_width ) * static_cast< std::size_t >( atlas_height ) * 4u );
+			for ( std::size_t i{ 0 }; i < static_cast< std::size_t >( atlas_width * atlas_height ); ++i )
+			{
+				rgba_bitmap[ i * 4 + 0 ] = 255u;
+				rgba_bitmap[ i * 4 + 1 ] = 255u;
+				rgba_bitmap[ i * 4 + 2 ] = 255u;
+				rgba_bitmap[ i * 4 + 3 ] = bitmap[ i ];
+			}
+
+			D3D11_SUBRESOURCE_DATA init_data{ rgba_bitmap.data( ), static_cast< UINT >( atlas_width * 4 ), 0u };
+
+			auto hr{ g_render.m_device->CreateTexture2D( &tex_desc, &init_data, &new_font->m_atlas->m_texture ) };
+			if ( FAILED( hr ) ) [[unlikely]]
+			{
+				return nullptr;
+			}
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+			srv_desc.Format = tex_desc.Format;
+			srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			srv_desc.Texture2D.MipLevels = 1;
+
+			hr = g_render.m_device->CreateShaderResourceView( new_font->m_atlas->m_texture.Get( ), &srv_desc, &new_font->m_atlas->m_texture_srv );
+			if ( FAILED( hr ) ) [[unlikely]]
+			{
+				return nullptr;
+			}
+
+			g_render.m_fonts.push_back( std::move( new_font ) );
+			return g_render.m_fonts.back( ).get( );
+		}
+
 
 		static void ensure_buffer_capacity( )
 		{
@@ -1109,6 +1192,17 @@ namespace zdraw {
 		}
 
 		detail::g_render.m_current_draw_list.reserve( 5000u, 10000u, 256u );
+
+		const auto font_span{ std::span( reinterpret_cast< const std::byte* >( fonts::pixter ), sizeof( fonts::pixter ) ) };
+		detail::g_render.m_default_font = detail::create_font( font_span, 13.0f, 512, 512 );
+
+		if ( detail::g_render.m_default_font == nullptr ) [[unlikely]]
+		{
+			return false;
+		}
+
+		detail::g_render.m_font_stack.push_back( detail::g_render.m_default_font );
+
 		return true;
 	}
 
@@ -1312,89 +1406,13 @@ namespace zdraw {
 
 		return load_texture_from_memory( buffer, out_width, out_height );
 	}
-
-	font* load_font_from_memory( std::span<const std::byte> font_data, float size_pixels, int atlas_width, int atlas_height )
+	
+	font* add_font_from_memory( std::span<const std::byte> font_data, float size_pixels, int atlas_width, int atlas_height )
 	{
-		auto new_font{ std::make_unique<font>( ) };
-		new_font->m_font_size = size_pixels;
-		new_font->m_atlas = std::make_shared<font_atlas>( );
-		new_font->m_atlas->m_width = atlas_width;
-		new_font->m_atlas->m_height = atlas_height;
-
-		std::vector<std::uint8_t> bitmap( static_cast< std::size_t >( atlas_width ) * static_cast< std::size_t >( atlas_height ), 0u );
-
-		new_font->m_packed_char_data = std::make_unique<stbtt_packedchar[ ]>( 95 );
-
-		stbtt_pack_context spc{};
-		if ( !stbtt_PackBegin( &spc, bitmap.data( ), atlas_width, atlas_height, 0, 1, nullptr ) ) [[unlikely]]
-		{
-			return nullptr;
-		}
-
-		stbtt_PackSetOversampling( &spc, 2, 2 );
-		stbtt_PackSetSkipMissingCodepoints( &spc, 1 );
-
-		stbtt_PackFontRange( &spc, reinterpret_cast< const unsigned char* >( font_data.data( ) ), 0, size_pixels, 32, 95, new_font->m_packed_char_data.get( ) );
-		stbtt_PackEnd( &spc );
-
-		stbtt_fontinfo info{};
-		stbtt_InitFont( &info, reinterpret_cast< const unsigned char* >( font_data.data( ) ), 0 );
-
-		int ascent{ 0 };
-		int descent{ 0 };
-		int line_gap{ 0 };
-		stbtt_GetFontVMetrics( &info, &ascent, &descent, &line_gap );
-
-		const float scale{ stbtt_ScaleForPixelHeight( &info, size_pixels ) };
-
-		new_font->m_ascent = static_cast< float >( ascent ) * scale;
-		new_font->m_descent = static_cast< float >( descent ) * scale;
-		new_font->m_line_gap = static_cast< float >( line_gap ) * scale;
-		new_font->m_line_height = new_font->m_ascent - new_font->m_descent + new_font->m_line_gap;
-
-		D3D11_TEXTURE2D_DESC tex_desc{};
-		tex_desc.Width = static_cast< UINT >( atlas_width );
-		tex_desc.Height = static_cast< UINT >( atlas_height );
-		tex_desc.MipLevels = 1;
-		tex_desc.ArraySize = 1;
-		tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		tex_desc.SampleDesc.Count = 1;
-		tex_desc.Usage = D3D11_USAGE_IMMUTABLE;
-		tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-		std::vector<std::uint8_t> rgba_bitmap( static_cast< std::size_t >( atlas_width ) * static_cast< std::size_t >( atlas_height ) * 4u );
-		for ( std::size_t i{ 0 }; i < static_cast< std::size_t >( atlas_width * atlas_height ); ++i )
-		{
-			rgba_bitmap[ i * 4 + 0 ] = 255u;
-			rgba_bitmap[ i * 4 + 1 ] = 255u;
-			rgba_bitmap[ i * 4 + 2 ] = 255u;
-			rgba_bitmap[ i * 4 + 3 ] = bitmap[ i ];
-		}
-
-		D3D11_SUBRESOURCE_DATA init_data{ rgba_bitmap.data( ), static_cast< UINT >( atlas_width * 4 ), 0u };
-
-		auto hr{ detail::g_render.m_device->CreateTexture2D( &tex_desc, &init_data, &new_font->m_atlas->m_texture ) };
-		if ( FAILED( hr ) ) [[unlikely]]
-		{
-			return nullptr;
-		}
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
-		srv_desc.Format = tex_desc.Format;
-		srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		srv_desc.Texture2D.MipLevels = 1;
-
-		hr = detail::g_render.m_device->CreateShaderResourceView( new_font->m_atlas->m_texture.Get( ), &srv_desc, &new_font->m_atlas->m_texture_srv );
-		if ( FAILED( hr ) ) [[unlikely]]
-		{
-			return nullptr;
-		}
-
-		detail::g_render.m_loaded_fonts.push_back( std::move( new_font ) );
-		return detail::g_render.m_loaded_fonts.back( ).get( );
+		return detail::create_font( font_data, size_pixels, atlas_width, atlas_height );
 	}
 
-	font* load_font_from_file( std::string_view filepath, float size_pixels, int atlas_width, int atlas_height )
+	font* add_font_from_file( std::string_view filepath, float size_pixels, int atlas_width, int atlas_height )
 	{
 		std::ifstream file{ std::string( filepath ), std::ios::binary | std::ios::ate };
 		if ( !file.is_open( ) ) [[unlikely]]
@@ -1411,20 +1429,42 @@ namespace zdraw {
 			return nullptr;
 		}
 
-		return load_font_from_memory( buffer, size_pixels, atlas_width, atlas_height );
+		return add_font_from_memory( buffer, size_pixels, atlas_width, atlas_height );
 	}
 
-	font* get_normal_font( ) noexcept
+	font* get_default_font( ) noexcept
 	{
-		if ( detail::g_render.m_normal_font == nullptr )
+		return detail::g_render.m_default_font;
+	}
+
+	font* get_font( ) noexcept
+	{
+		if ( detail::g_render.m_font_stack.empty( ) ) [[unlikely]]
 		{
-			const auto font_span{ std::span( reinterpret_cast< const std::byte* >( fonts::pixter ), sizeof( fonts::pixter ) ) };
-			detail::g_render.m_normal_font = load_font_from_memory( font_span, 13.0f, 512, 512 );
+			return detail::g_render.m_default_font;
 		}
 
-		return detail::g_render.m_normal_font;
-	}	
-	
+		return detail::g_render.m_font_stack.back( );
+	}
+
+	void push_font( font* f )
+	{
+		if ( f == nullptr )
+		{
+			f = detail::g_render.m_default_font;
+		}
+
+		detail::g_render.m_font_stack.push_back( f );
+	}
+
+	void pop_font( )
+	{
+		if ( detail::g_render.m_font_stack.size( ) > 1 )
+		{
+			detail::g_render.m_font_stack.pop_back( );
+		}
+	}
+
 	void push_clip_rect( float x0, float y0, float x1, float y1 ) 
 	{ 
 		get_draw_list( ).push_clip_rect( x0, y0, x1, y1 );
@@ -1487,7 +1527,7 @@ namespace zdraw {
 
 	std::pair<float, float> measure_text( std::string_view text, const font* fnt )
 	{
-		const auto f{ fnt != nullptr ? fnt : get_normal_font( ) };
+		const auto f{ fnt != nullptr ? fnt : get_font( ) };
 
 		float w, h;
 		f->calc_text_size( text, w, h );
