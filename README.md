@@ -1,8 +1,4 @@
-# zdraw & zui
-
-a lightweight, modern C++ dx11 rendering library with an immediate mode gui system.
-
-## features
+# features
 
 ### zdraw (rendering)
 - 2d primitives (lines, rectangles, circles, polygons, etc)
