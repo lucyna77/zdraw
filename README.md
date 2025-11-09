@@ -33,8 +33,8 @@ if ( zui::begin_window( "window", x, y, w, h, true ) )
     static bool bool_value = false;
     zui::checkbox( "checkbox", bool_value );
     
-    static int int_value  = 50;
-    zui::slider_int( "int slider", int_value, 1, 100);
+    static int int_value = 50;
+    zui::slider_int( "int slider", int_value, 1, 100 );
     
     if ( zui::button( "button", 200, 30 ) ) { }
     
