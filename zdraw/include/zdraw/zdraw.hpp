@@ -290,7 +290,7 @@ namespace zdraw
 		{
 			constexpr float offsets[ 4 ][ 2 ]{ {-1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, -1.0f}, {0.0f, 1.0f} };
 
-			for ( int i{ 0 }; i < 8; ++i )
+			for ( int i{ 0 }; i < 4; ++i )
 			{
 				get_draw_list( ).add_text( x + offsets[ i ][ 0 ], y + offsets[ i ][ 1 ], str, f, rgba( 0, 0, 0, 235 ) );
 			}

@@ -279,11 +279,13 @@ namespace zdraw {
 			}
 
 			D3D11_SAMPLER_DESC sampler_desc{};
-			sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+			sampler_desc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 			sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 			sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 			sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 			sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+			sampler_desc.MinLOD = 0.0f;
+			sampler_desc.MaxLOD = 0.0f;
 
 			return SUCCEEDED( g_render.m_device->CreateSamplerState( &sampler_desc, &g_render.m_sampler_state ) );
 		}
@@ -352,7 +354,7 @@ namespace zdraw {
 				return nullptr;
 			}
 
-			stbtt_PackSetOversampling( &spc, 4, 2 );
+			stbtt_PackSetOversampling( &spc, 2, 2 );
 			stbtt_PackSetSkipMissingCodepoints( &spc, 1 );
 
 			stbtt_PackFontRange( &spc, reinterpret_cast< const unsigned char* >( font_data.data( ) ), 0, size_pixels, 32, 95, new_font->m_packed_char_data.get( ) );
@@ -376,13 +378,13 @@ namespace zdraw {
 			D3D11_TEXTURE2D_DESC tex_desc{};
 			tex_desc.Width = static_cast< UINT >( atlas_width );
 			tex_desc.Height = static_cast< UINT >( atlas_height );
-			tex_desc.MipLevels = 0;
+			tex_desc.MipLevels = 1;
 			tex_desc.ArraySize = 1;
-			tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			tex_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 			tex_desc.SampleDesc.Count = 1;
 			tex_desc.Usage = D3D11_USAGE_DEFAULT;
-			tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-			tex_desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+			tex_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			tex_desc.MiscFlags = 0;
 
 			std::vector<std::uint8_t> rgba_bitmap( static_cast< std::size_t >( atlas_width ) * static_cast< std::size_t >( atlas_height ) * 4u );
 			for ( std::size_t i{ 0 }; i < static_cast< std::size_t >( atlas_width * atlas_height ); ++i )
@@ -393,18 +395,21 @@ namespace zdraw {
 				rgba_bitmap[ i * 4 + 3 ] = bitmap[ i ];
 			}
 
-			auto hr{ g_render.m_device->CreateTexture2D( &tex_desc, nullptr, &new_font->m_atlas->m_texture ) };
+			D3D11_SUBRESOURCE_DATA init_data{};
+			init_data.pSysMem = rgba_bitmap.data( );
+			init_data.SysMemPitch = atlas_width * 4;
+			init_data.SysMemSlicePitch = 0;
+
+			auto hr{ g_render.m_device->CreateTexture2D( &tex_desc, &init_data, &new_font->m_atlas->m_texture ) };
 			if ( FAILED( hr ) ) [[unlikely]]
 			{
 				return nullptr;
 			}
 
-			g_render.m_context->UpdateSubresource( new_font->m_atlas->m_texture.Get( ), 0, nullptr, rgba_bitmap.data( ), atlas_width * 4, 0 );
-
 			D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
 			srv_desc.Format = tex_desc.Format;
 			srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-			srv_desc.Texture2D.MipLevels = -1;
+			srv_desc.Texture2D.MipLevels = 1;
 			srv_desc.Texture2D.MostDetailedMip = 0;
 
 			hr = g_render.m_device->CreateShaderResourceView( new_font->m_atlas->m_texture.Get( ), &srv_desc, &new_font->m_atlas->m_texture_srv );
@@ -412,8 +417,6 @@ namespace zdraw {
 			{
 				return nullptr;
 			}
-
-			g_render.m_context->GenerateMips( new_font->m_atlas->m_texture_srv.Get( ) );
 
 			g_render.m_fonts.push_back( std::move( new_font ) );
 			return g_render.m_fonts.back( ).get( );
