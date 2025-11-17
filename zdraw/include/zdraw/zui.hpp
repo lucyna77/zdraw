@@ -21,7 +21,7 @@ namespace zui {
 		float item_spacing_y{ 8.0f };
 		float frame_padding_x{ 6.0f };
 		float frame_padding_y{ 3.0f };
-		float window_rounding{ 0.0f };
+		float window_rounding{ 3.0f };
 		float border_thickness{ 1.0f };
 		float group_box_title_height{ 16.0f };
 		float checkbox_size{ 16.0f };
@@ -29,6 +29,17 @@ namespace zui {
 		float keybind_height{ 18.0f };
 		float combo_height{ 20.0f };
 		float combo_item_height{ 18.0f };
+
+		float nested_rounding{ 3.0f };
+		float group_box_rounding{ 3.0f };
+		float checkbox_rounding{ 3.0f };
+		float slider_rounding{ 3.0f };
+		float button_rounding{ 3.0f };
+		float keybind_rounding{ 3.0f };
+		float combo_rounding{ 3.0f };
+		float combo_popup_rounding{ 3.0f };
+		float color_picker_swatch_rounding{ 3.0f };
+		float color_picker_popup_rounding{ 3.0f };
 
 		zdraw::rgba window_bg{ 245, 242, 252, 255 };
 		zdraw::rgba window_border{ 200, 190, 225, 255 };
@@ -85,7 +96,17 @@ namespace zui {
 		slider_height,
 		keybind_height,
 		combo_height,
-		combo_item_height
+		combo_item_height,
+		nested_rounding,
+		group_box_rounding,
+		checkbox_rounding,
+		slider_rounding,
+		button_rounding,
+		keybind_rounding,
+		combo_rounding,
+		combo_popup_rounding,
+		color_picker_swatch_rounding,
+		color_picker_popup_rounding
 	};
 
 	enum class style_color

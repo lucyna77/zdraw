@@ -140,6 +140,12 @@ namespace zdraw
 		nvec<draw_cmd> m_commands{};
 		std::vector<D3D11_RECT> m_clip_stack{};
 
+		nvec<float> m_scratch_normals_x{};
+		nvec<float> m_scratch_normals_y{};
+		nvec<float> m_scratch_points{};
+		nvec<float> m_scratch_core_points{};
+		nvec<float> m_scratch_aa_points{};
+
 		void clear( ) noexcept
 		{
 			this->m_vertices.clear( );
@@ -152,7 +158,7 @@ namespace zdraw
 		{
 			this->m_vertices.reserve( vtx_count );
 			this->m_indices.reserve( idx_count );
-			if ( cmd_count > 0 ) this->m_commands.reserve( cmd_count );
+			if ( cmd_count > 0 ) { this->m_commands.reserve( cmd_count ); }
 		}
 
 		void push_vertex( float x, float y, float u, float v, rgba color )
@@ -171,10 +177,10 @@ namespace zdraw
 		void ensure_draw_cmd( ID3D11ShaderResourceView* texture );
 
 		void add_line( float x0, float y0, float x1, float y1, rgba color, float thickness = 1.0f );
-		void add_rect( float x, float y, float w, float h, rgba color, float thickness = 1.0f );
+		void add_rect( float x, float y, float w, float h, rgba color, float rounding = 0.0f, float thickness = 1.0f );
 		void add_rect_cornered( float x, float y, float w, float h, rgba color, float corner_length, float thickness );
-		void add_rect_filled( float x, float y, float w, float h, rgba color );
-		void add_rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl );
+		void add_rect_filled( float x, float y, float w, float h, rgba color, float rounding = 0.0f );
+		void add_rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl, float rounding = 0.0f );
 		void add_rect_textured( float x, float y, float w, float h, ID3D11ShaderResourceView* tex, float u0 = 0.0f, float v0 = 0.0f, float u1 = 1.0f, float v1 = 1.0f );
 		void add_convex_poly_filled( std::span<const float> points, rgba color );
 		void add_polyline( std::span<const float> points, rgba color, bool closed = false, float thickness = 1.0f );
@@ -219,8 +225,17 @@ namespace zdraw
 		float m_line_height{ 0.0f };
 		std::unique_ptr<stbtt_packedchar[ ]> m_packed_char_data{};
 
+		struct string_hash
+		{
+			using is_transparent = void;
+			using hash_type = std::hash<std::string_view>;
+
+			[[nodiscard]] std::size_t operator()( std::string_view sv ) const noexcept { return hash_type{}( sv ); }
+			[[nodiscard]] std::size_t operator()( const std::string& s ) const noexcept { return hash_type{}( s ); }
+		};
+
 		mutable ankerl::unordered_dense::map<char, glyph_cache_entry> m_glyph_cache{};
-		mutable ankerl::unordered_dense::map<std::string, std::pair<float, float>> m_text_size_cache{};
+		mutable ankerl::unordered_dense::map<std::string, std::pair<float, float>, string_hash, std::equal_to<>> m_text_size_cache{};
 
 		font( ) = default;
 		font( const font& ) = delete;
@@ -266,10 +281,10 @@ namespace zdraw
 	void pop_clip_rect( );
 
 	void line( float x0, float y0, float x1, float y1, rgba color, float thickness = 1.0f );
-	void rect( float x, float y, float w, float h, rgba color, float thickness = 1.0f );
+	void rect( float x, float y, float w, float h, rgba color, float rounding = 0.0f, float thickness = 1.0f );
 	void rect_cornered( float x, float y, float w, float h, rgba color, float corner_length = 15.0f, float thickness = 1.0f );
-	void rect_filled( float x, float y, float w, float h, rgba color );
-	void rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl );
+	void rect_filled( float x, float y, float w, float h, rgba color, float rounding = 0.0f );
+	void rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl, float rounding = 0.0f );
 	void rect_textured( float x, float y, float w, float h, ID3D11ShaderResourceView* tex, float u0 = 0.0f, float v0 = 0.0f, float u1 = 1.0f, float v1 = 1.0f );
 	void convex_poly_filled( std::span<const float> points, rgba color );
 	void polyline( std::span<const float> points, rgba color, bool closed = false, float thickness = 1.0f );

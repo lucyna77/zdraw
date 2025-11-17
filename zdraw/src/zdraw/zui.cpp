@@ -2,7 +2,6 @@
 #include <include/zdraw/zui.hpp>
 
 #include <algorithm>
-#include <chrono>
 
 namespace zui {
 
@@ -89,9 +88,6 @@ namespace zui {
 			std::uintptr_t m_active_color_picker_id{ 0 };
 			std::uintptr_t m_changed_color_picker_id{ 0 };
 			std::optional<color_picker_popup_data> m_active_color_picker_popup{};
-
-			float m_delta_time{ 0.0f };
-			std::chrono::high_resolution_clock::time_point m_last_frame_time{};
 		};
 
 		static context g_ctx{};
@@ -252,6 +248,16 @@ namespace zui {
 			case style_var::keybind_height: return &g_ctx.m_style.keybind_height;
 			case style_var::combo_height: return &g_ctx.m_style.combo_height;
 			case style_var::combo_item_height: return &g_ctx.m_style.combo_item_height;
+			case style_var::nested_rounding: return &g_ctx.m_style.nested_rounding;
+			case style_var::group_box_rounding: return &g_ctx.m_style.group_box_rounding;
+			case style_var::checkbox_rounding: return &g_ctx.m_style.checkbox_rounding;
+			case style_var::slider_rounding: return &g_ctx.m_style.slider_rounding;
+			case style_var::button_rounding: return &g_ctx.m_style.button_rounding;
+			case style_var::keybind_rounding: return &g_ctx.m_style.keybind_rounding;
+			case style_var::combo_rounding: return &g_ctx.m_style.combo_rounding;
+			case style_var::combo_popup_rounding: return &g_ctx.m_style.combo_popup_rounding;
+			case style_var::color_picker_swatch_rounding: return &g_ctx.m_style.color_picker_swatch_rounding;
+			case style_var::color_picker_popup_rounding: return &g_ctx.m_style.color_picker_popup_rounding;
 			default: return nullptr;
 			}
 		}
@@ -291,24 +297,12 @@ namespace zui {
 		detail::g_ctx.m_prev_input = detail::g_ctx.m_input;
 		detail::update_input( );
 
-		const auto current_time = std::chrono::high_resolution_clock::now( );
-		if ( detail::g_ctx.m_last_frame_time.time_since_epoch( ).count( ) != 0 )
-		{
-			detail::g_ctx.m_delta_time = std::chrono::duration<float>( current_time - detail::g_ctx.m_last_frame_time ).count( );
-		}
-		else
-		{
-			detail::g_ctx.m_delta_time = 1.0f / 60.0f;
-		}
-
-		detail::g_ctx.m_last_frame_time = current_time;
-
 		detail::g_ctx.m_overlay_consuming_input = false;
 		detail::g_ctx.m_windows.clear( );
 		detail::g_ctx.m_id_stack.clear( );
 	}
 
-	void end( ) // remind my ass to add multiple drawlists to zdraw???
+	void end( )
 	{
 		if ( detail::g_ctx.m_active_popup.has_value( ) )
 		{
@@ -327,9 +321,9 @@ namespace zui {
 				const auto bg_top = style.combo_popup_bg;
 				const auto bg_bottom = detail::darken_color( bg_top, 0.9f );
 
-				zdraw::rect_filled( dropdown_rect.m_x + 2.0f, dropdown_rect.m_y + 2.0f, popup.width, dropdown_h, zdraw::rgba{ 0, 0, 0, 60 } );
-				zdraw::rect_filled_multi_color( dropdown_rect.m_x, dropdown_rect.m_y, popup.width, dropdown_h, bg_top, bg_top, bg_bottom, bg_bottom );
-				zdraw::rect( dropdown_rect.m_x, dropdown_rect.m_y, popup.width, dropdown_h, detail::lighten_color( style.combo_popup_border, 1.1f ), 1.0f );
+				zdraw::rect_filled( dropdown_rect.m_x + 2.0f, dropdown_rect.m_y + 2.0f, popup.width, dropdown_h, zdraw::rgba{ 0, 0, 0, 60 }, style.combo_popup_rounding );
+				zdraw::rect_filled_multi_color( dropdown_rect.m_x, dropdown_rect.m_y, popup.width, dropdown_h, bg_top, bg_top, bg_bottom, bg_bottom, style.combo_popup_rounding );
+				zdraw::rect( dropdown_rect.m_x, dropdown_rect.m_y, popup.width, dropdown_h, detail::lighten_color( style.combo_popup_border, 1.1f ), style.combo_popup_rounding );
 
 				zdraw::push_clip_rect( dropdown_rect.m_x, dropdown_rect.m_y, dropdown_rect.m_x + dropdown_rect.m_w, dropdown_rect.m_y + dropdown_rect.m_h );
 
@@ -350,16 +344,16 @@ namespace zui {
 					if ( i == *popup.current_item )
 					{
 						const auto selected_col = style.combo_item_selected;
-						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, item_rect.m_w, item_rect.m_h, selected_col );
+						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, item_rect.m_w, item_rect.m_h, selected_col, style.combo_popup_rounding * 0.3f );
 
 						const auto accent_bar_col = detail::lighten_color( style.combo_arrow, 1.2f );
-						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, 2.0f, item_rect.m_h, accent_bar_col );
+						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, 2.0f, item_rect.m_h, accent_bar_col, 1.0f );
 					}
 
 					if ( item_hovered )
 					{
 						const auto hover_col = style.combo_item_hovered;
-						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, item_rect.m_w, item_rect.m_h, hover_col );
+						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, item_rect.m_w, item_rect.m_h, hover_col, style.combo_popup_rounding * 0.3f );
 					}
 
 					auto [text_w, text_h] = zdraw::measure_text( popup.item_strings[ i ] );
@@ -402,13 +396,15 @@ namespace zui {
 				const auto bg_top = style.combo_popup_bg;
 				const auto bg_bottom = detail::darken_color( bg_top, 0.9f );
 
-				zdraw::rect_filled_multi_color( popup_rect.m_x, popup_rect.m_y, popup_w, popup_h, bg_top, bg_top, bg_bottom, bg_bottom );
-				zdraw::rect( popup_rect.m_x, popup_rect.m_y, popup_w, popup_h, detail::lighten_color( style.combo_popup_border, 1.1f ), 1.0f );
+				zdraw::rect_filled_multi_color( popup_rect.m_x, popup_rect.m_y, popup_w, popup_h, bg_top, bg_top, bg_bottom, bg_bottom, style.color_picker_popup_rounding );
+				zdraw::rect( popup_rect.m_x, popup_rect.m_y, popup_w, popup_h, detail::lighten_color( style.combo_popup_border, 1.1f ), style.color_picker_popup_rounding );
 				zdraw::push_clip_rect( popup_rect.m_x, popup_rect.m_y, popup_rect.m_x + popup_rect.m_w, popup_rect.m_y + popup_rect.m_h );
 
 				const auto pad = 8.0f;
 				const auto sv_size = popup_w - pad * 2.0f;
 				const auto sv_rect = rect{ popup_x + pad, popup_y + pad, sv_size, sv_size };
+
+				const auto sv_rounding = style.color_picker_popup_rounding * 0.5f;
 
 				for ( int y = 0; y < static_cast< int >( sv_size ); ++y )
 				{
@@ -439,13 +435,14 @@ namespace zui {
 							255
 						};
 
-						zdraw::rect_filled( sv_rect.m_x + x, sv_rect.m_y + y, 1.0f, 1.0f, pixel_color );
+						zdraw::rect_filled( sv_rect.m_x + x, sv_rect.m_y + y, 1.0f, 1.0f, pixel_color, 0.0f );
 					}
 				}
 
 				const auto hue_y = sv_rect.m_y + sv_rect.m_h + pad;
 				const auto hue_h = 14.0f;
 				const auto hue_rect = rect{ popup_x + pad, hue_y, sv_size, hue_h };
+				const auto hue_rounding = 3.0f;
 
 				for ( int x = 0; x < static_cast< int >( sv_size ); ++x )
 				{
@@ -471,7 +468,7 @@ namespace zui {
 						255
 					};
 
-					zdraw::rect_filled( hue_rect.m_x + x, hue_rect.m_y, 1.0f, hue_rect.m_h, hue_color );
+					zdraw::rect_filled( hue_rect.m_x + x, hue_rect.m_y, 1.0f, hue_rect.m_h, hue_color, 0.0f );
 				}
 
 				const auto alpha_y = hue_y + hue_h + pad * 0.5f;
@@ -483,7 +480,7 @@ namespace zui {
 					{
 						const auto is_dark = ( ( x / 8 ) + ( y / 8 ) ) % 2 == 0;
 						const auto checker_col = is_dark ? zdraw::rgba{ 180, 180, 180, 255 } : zdraw::rgba{ 220, 220, 220, 255 };
-						zdraw::rect_filled( alpha_rect.m_x + x, alpha_rect.m_y + y, std::min( 8.0f, sv_size - x ), std::min( 8.0f, hue_h - y ), checker_col );
+						zdraw::rect_filled( alpha_rect.m_x + x, alpha_rect.m_y + y, std::min( 8.0f, sv_size - x ), std::min( 8.0f, hue_h - y ), checker_col, 0.0f );
 					}
 				}
 
@@ -491,7 +488,7 @@ namespace zui {
 				{
 					const auto alpha = static_cast< std::uint8_t >( ( x / sv_size ) * 255.0f );
 					const auto alpha_color = zdraw::rgba{ popup.color_ptr->r, popup.color_ptr->g, popup.color_ptr->b, alpha };
-					zdraw::rect_filled( alpha_rect.m_x + x, alpha_rect.m_y, 1.0f, alpha_rect.m_h, alpha_color );
+					zdraw::rect_filled( alpha_rect.m_x + x, alpha_rect.m_y, 1.0f, alpha_rect.m_h, alpha_color, 0.0f );
 				}
 
 				const auto sv_hovered = detail::mouse_in_rect( sv_rect );
@@ -580,15 +577,15 @@ namespace zui {
 
 				const auto cursor_x = sv_rect.m_x + popup.sv_x * sv_rect.m_w;
 				const auto cursor_y = sv_rect.m_y + popup.sv_y * sv_rect.m_h;
-				zdraw::rect( cursor_x - 4.0f, cursor_y - 4.0f, 8.0f, 8.0f, zdraw::rgba{ 255, 255, 255, 255 }, 2.0f );
-				zdraw::rect( cursor_x - 3.0f, cursor_y - 3.0f, 6.0f, 6.0f, zdraw::rgba{ 0, 0, 0, 255 }, 1.0f );
+				zdraw::rect( cursor_x - 4.0f, cursor_y - 4.0f, 8.0f, 8.0f, zdraw::rgba{ 255, 255, 255, 255 }, 4.0f, 2.0f );
+				zdraw::rect( cursor_x - 3.0f, cursor_y - 3.0f, 6.0f, 6.0f, zdraw::rgba{ 0, 0, 0, 255 }, 3.0f );
 
 				const auto hue_cursor_x = hue_rect.m_x + popup.hue_value * hue_rect.m_w;
-				zdraw::rect( hue_cursor_x - 2.0f, hue_rect.m_y - 2.0f, 4.0f, hue_rect.m_h + 4.0f, zdraw::rgba{ 255, 255, 255, 255 }, 2.0f );
+				zdraw::rect( hue_cursor_x - 2.0f, hue_rect.m_y - 2.0f, 4.0f, hue_rect.m_h + 4.0f, zdraw::rgba{ 255, 255, 255, 255 }, 2.0f, 2.0f );
 				zdraw::rect( hue_cursor_x - 1.0f, hue_rect.m_y - 1.0f, 2.0f, hue_rect.m_h + 2.0f, zdraw::rgba{ 0, 0, 0, 255 }, 1.0f );
 
 				const auto alpha_cursor_x = alpha_rect.m_x + ( popup.color_ptr->a / 255.0f ) * alpha_rect.m_w;
-				zdraw::rect( alpha_cursor_x - 2.0f, alpha_rect.m_y - 2.0f, 4.0f, alpha_rect.m_h + 4.0f, zdraw::rgba{ 255, 255, 255, 255 }, 2.0f );
+				zdraw::rect( alpha_cursor_x - 2.0f, alpha_rect.m_y - 2.0f, 4.0f, alpha_rect.m_h + 4.0f, zdraw::rgba{ 255, 255, 255, 255 }, 2.0f, 2.0f );
 				zdraw::rect( alpha_cursor_x - 1.0f, alpha_rect.m_y - 1.0f, 2.0f, alpha_rect.m_h + 2.0f, zdraw::rgba{ 0, 0, 0, 255 }, 1.0f );
 
 				zdraw::pop_clip_rect( );
@@ -674,11 +671,11 @@ namespace zui {
 		const auto color_bl = base_color;
 		const auto color_br = detail::darken_color( base_color, 0.85f );
 
-		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tr, color_br, color_bl );
+		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tr, color_br, color_bl, detail::g_ctx.m_style.window_rounding );
 
 		if ( detail::g_ctx.m_style.border_thickness > 0.0f )
 		{
-			zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, detail::g_ctx.m_style.window_border, detail::g_ctx.m_style.border_thickness );
+			zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, detail::g_ctx.m_style.window_border, detail::g_ctx.m_style.window_rounding, detail::g_ctx.m_style.border_thickness );
 		}
 
 		zdraw::push_clip_rect( abs.m_x, abs.m_y, abs.m_x + abs.m_w, abs.m_y + abs.m_h );
@@ -729,11 +726,11 @@ namespace zui {
 		const auto color_bl = base_color;
 		const auto color_br = detail::darken_color( base_color, 0.85f );
 
-		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tr, color_br, color_bl );
+		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, color_tl, color_tr, color_br, color_bl, detail::g_ctx.m_style.nested_rounding );
 
 		if ( detail::g_ctx.m_style.border_thickness > 0.0f )
 		{
-			zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, detail::g_ctx.m_style.nested_border, detail::g_ctx.m_style.border_thickness );
+			zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, detail::g_ctx.m_style.nested_border, detail::g_ctx.m_style.nested_rounding, detail::g_ctx.m_style.border_thickness );
 		}
 
 		zdraw::push_clip_rect( abs.m_x, abs.m_y, abs.m_x + abs.m_w, abs.m_y + abs.m_h );
@@ -762,10 +759,13 @@ namespace zui {
 		const auto bg_col = detail::g_ctx.m_style.group_box_bg;
 		const auto border_col = detail::g_ctx.m_style.group_box_border;
 		const auto thickness = detail::g_ctx.m_style.border_thickness;
+		const auto rounding = detail::g_ctx.m_style.group_box_rounding;
 
 		const auto border_y = abs.m_y + title_h * 0.5f;
+		const auto box_height = abs.m_h - title_h * 0.5f;
 
-		zdraw::rect_filled( abs.m_x, border_y, abs.m_w, abs.m_h - title_h * 0.5f, bg_col );
+		zdraw::rect_filled( abs.m_x, border_y, abs.m_w, box_height, bg_col, rounding );
+		zdraw::rect( abs.m_x, border_y, abs.m_w, box_height, border_col, rounding, thickness );
 
 		if ( !title.empty( ) )
 		{
@@ -774,27 +774,16 @@ namespace zui {
 			const auto text_y = abs.m_y;
 			const auto pad = 4.0f;
 
-			const auto border_y = std::round( abs.m_y + title_h * 0.5f );
-			const auto gap_start = std::round( text_x - pad );
-			const auto gap_end = std::round( text_x + title_w + pad );
+			const auto gap_start = text_x - pad;
+			const auto gap_end = text_x + title_w + pad;
 
-			zdraw::rect_filled( abs.m_x, border_y - thickness * 0.5f, gap_start - abs.m_x, thickness, border_col );
-			zdraw::rect_filled( gap_end, border_y - thickness * 0.5f, abs.m_x + abs.m_w - gap_end, thickness, border_col );
-
-			zdraw::line( abs.m_x + abs.m_w, border_y, abs.m_x + abs.m_w, abs.m_y + abs.m_h, border_col, thickness );
-			zdraw::line( abs.m_x, abs.m_y + abs.m_h, abs.m_x + abs.m_w, abs.m_y + abs.m_h, border_col, thickness );
-			zdraw::line( abs.m_x, border_y, abs.m_x, abs.m_y + abs.m_h, border_col, thickness );
-
-			zdraw::rect_filled( gap_start, text_y, gap_end - gap_start, title_h, bg_col );
-			zdraw::rect( gap_start, text_y, gap_end - gap_start, title_h, border_col );
+			const auto title_rounding = rounding * 0.5f;
+			zdraw::rect_filled( gap_start, text_y, gap_end - gap_start, title_h, bg_col, title_rounding );
+			zdraw::rect( gap_start, text_y, gap_end - gap_start, title_h, border_col, title_rounding, thickness );
 
 			std::string title_str( title.begin( ), title.end( ) );
 			const auto text_actual_y = text_y + ( title_h - title_h_measured ) * 0.5f;
 			zdraw::text( text_x, text_actual_y, title_str, detail::g_ctx.m_style.group_box_title_text );
-		}
-		else
-		{
-			zdraw::rect( abs.m_x, border_y, abs.m_w, abs.m_h - title_h * 0.5f, border_col, thickness );
 		}
 
 		detail::g_ctx.m_windows.emplace_back( );
@@ -1002,7 +991,7 @@ namespace zui {
 			changed = true;
 		}
 
-		const auto anim_speed = 12.0f * detail::g_ctx.m_delta_time;
+		const auto anim_speed = 12.0f * zdraw::get_delta_time( );
 		const auto target = v ? 1.0f : 0.0f;
 		anim = anim + ( target - anim ) * anim_speed;
 
@@ -1010,8 +999,8 @@ namespace zui {
 		const auto border_col = hovered ? detail::lighten_color( detail::g_ctx.m_style.checkbox_border, 1.15f ) : detail::g_ctx.m_style.checkbox_border;
 		const auto check_col = detail::g_ctx.m_style.checkbox_check;
 
-		zdraw::rect_filled( abs.m_x, abs.m_y, abs.m_w, abs.m_h, bg_col );
-		zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, border_col, 1.0f );
+		zdraw::rect_filled( abs.m_x, abs.m_y, abs.m_w, abs.m_h, bg_col, detail::g_ctx.m_style.checkbox_rounding );
+		zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, border_col, detail::g_ctx.m_style.checkbox_rounding );
 
 		if ( anim > 0.01f )
 		{
@@ -1037,7 +1026,7 @@ namespace zui {
 				static_cast< std::uint8_t >( check_col.a * anim )
 			};
 
-			zdraw::rect_filled_multi_color( fill_x, fill_y, fill_w, fill_h, col_top, col_top, col_bottom, col_bottom );
+			zdraw::rect_filled_multi_color( fill_x, fill_y, fill_w, fill_h, col_top, col_top, col_bottom, col_bottom, detail::g_ctx.m_style.checkbox_rounding * 0.5f );
 		}
 
 		if ( !label.empty( ) )
@@ -1074,8 +1063,8 @@ namespace zui {
 
 		const auto col_top = bg_col;
 		const auto col_bottom = detail::darken_color( bg_col, 0.85f );
-		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, col_top, col_top, col_bottom, col_bottom );
-		zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, border_col, 1.0f );
+		zdraw::rect_filled_multi_color( abs.m_x, abs.m_y, abs.m_w, abs.m_h, col_top, col_top, col_bottom, col_bottom, detail::g_ctx.m_style.button_rounding );
+		zdraw::rect( abs.m_x, abs.m_y, abs.m_w, abs.m_h, border_col, detail::g_ctx.m_style.button_rounding );
 
 		if ( !label.empty( ) )
 		{
@@ -1180,8 +1169,8 @@ namespace zui {
 		const auto bg_col = detail::g_ctx.m_style.keybind_bg;
 		const auto border_col = held && hovered ? detail::lighten_color( detail::g_ctx.m_style.keybind_border, 1.3f ) : ( hovered ? detail::lighten_color( detail::g_ctx.m_style.keybind_border, 1.15f ) : detail::g_ctx.m_style.keybind_border );
 
-		zdraw::rect_filled( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, bg_col );
-		zdraw::rect( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, border_col, 1.0f );
+		zdraw::rect_filled( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, bg_col, detail::g_ctx.m_style.keybind_rounding );
+		zdraw::rect( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, border_col, detail::g_ctx.m_style.keybind_rounding );
 
 		if ( is_waiting )
 		{
@@ -1200,7 +1189,7 @@ namespace zui {
 			col_left_alpha.a = static_cast< std::uint8_t >( col_left.a * 0.3f );
 			col_right_alpha.a = static_cast< std::uint8_t >( col_right.a * 0.3f );
 
-			zdraw::rect_filled_multi_color( fill_x, fill_y, fill_w, fill_h, col_left_alpha, col_right_alpha, col_right_alpha, col_left_alpha );
+			zdraw::rect_filled_multi_color( fill_x, fill_y, fill_w, fill_h, col_left_alpha, col_right_alpha, col_right_alpha, col_left_alpha, detail::g_ctx.m_style.keybind_rounding * 0.5f );
 		}
 
 		const auto text_x = button_rect.m_x + ( button_rect.m_w - button_text_w ) * 0.5f;
@@ -1341,7 +1330,7 @@ namespace zui {
 			changed = true;
 		}
 
-		const auto value_lerp_speed = 20.0f * detail::g_ctx.m_delta_time;
+		const auto value_lerp_speed = 20.0f * zdraw::get_delta_time( );
 		value_anim = value_anim + ( static_cast< float >( v ) - value_anim ) * value_lerp_speed;
 
 		if ( !label.empty( ) )
@@ -1355,8 +1344,8 @@ namespace zui {
 		const auto bg_col = detail::g_ctx.m_style.slider_bg;
 		const auto border_col = is_active ? detail::lighten_color( detail::g_ctx.m_style.slider_border, 1.3f ) : ( hovered ? detail::lighten_color( detail::g_ctx.m_style.slider_border, 1.15f ) : detail::g_ctx.m_style.slider_border );
 
-		zdraw::rect_filled( frame_rect.m_x, frame_rect.m_y, frame_rect.m_w, frame_rect.m_h, bg_col );
-		zdraw::rect( frame_rect.m_x, frame_rect.m_y, frame_rect.m_w, frame_rect.m_h, border_col, 1.0f );
+		zdraw::rect_filled( frame_rect.m_x, frame_rect.m_y, frame_rect.m_w, frame_rect.m_h, bg_col, detail::g_ctx.m_style.slider_rounding );
+		zdraw::rect( frame_rect.m_x, frame_rect.m_y, frame_rect.m_w, frame_rect.m_h, border_col, detail::g_ctx.m_style.slider_rounding );
 
 		const auto normalized_pos = ( value_anim - static_cast< float >( v_min ) ) / static_cast< float >( v_max - v_min );
 		const auto fill_width = ( frame_rect.m_w - 4.0f ) * normalized_pos;
@@ -1372,7 +1361,7 @@ namespace zui {
 			const auto col_left = detail::lighten_color( fill_col, 1.2f );
 			const auto col_right = detail::darken_color( fill_col, 0.8f );
 
-			zdraw::rect_filled_multi_color( fill_x, fill_y, fill_width, fill_h, col_left, col_right, col_right, col_left );
+			zdraw::rect_filled_multi_color( fill_x, fill_y, fill_width, fill_h, col_left, col_right, col_right, col_left, detail::g_ctx.m_style.slider_rounding * 0.5f );
 		}
 
 		return changed;
@@ -1433,7 +1422,7 @@ namespace zui {
 		auto& hover_anim = hover_anims[ id ];
 
 		const auto hover_target = hovered ? 1.0f : 0.0f;
-		hover_anim = hover_anim + ( hover_target - hover_anim ) * std::min( 15.0f * detail::g_ctx.m_delta_time, 1.0f );
+		hover_anim = hover_anim + ( hover_target - hover_anim ) * std::min( 15.0f * zdraw::get_delta_time( ), 1.0f );
 
 		if ( hovered && detail::g_ctx.m_input.m_clicked && !detail::g_ctx.m_overlay_consuming_input && detail::g_ctx.m_active_color_picker_id == 0 )
 		{
@@ -1455,8 +1444,8 @@ namespace zui {
 
 		const auto col_top = detail::lighten_color( bg_col, 1.1f );
 		const auto col_bottom = detail::darken_color( bg_col, 0.85f );
-		zdraw::rect_filled_multi_color( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, col_top, col_top, col_bottom, col_bottom );
-		zdraw::rect( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, border_col, 1.0f );
+		zdraw::rect_filled_multi_color( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, col_top, col_top, col_bottom, col_bottom, detail::g_ctx.m_style.combo_rounding );
+		zdraw::rect( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, border_col, detail::g_ctx.m_style.combo_rounding );
 
 		const auto current_text = ( current_item >= 0 && current_item < items_count ) ? items[ current_item ] : "";
 		auto [text_w, text_h] = zdraw::measure_text( current_text );
@@ -1555,7 +1544,7 @@ namespace zui {
 		const auto bg_col = detail::g_ctx.m_style.checkbox_bg;
 		const auto border_col = is_open ? detail::lighten_color( detail::g_ctx.m_style.checkbox_border, 1.3f ) : ( hovered ? detail::lighten_color( detail::g_ctx.m_style.checkbox_border, 1.15f ) : detail::g_ctx.m_style.checkbox_border );
 
-		zdraw::rect_filled( swatch_rect.m_x, swatch_rect.m_y, swatch_rect.m_w, swatch_rect.m_h, bg_col );
+		zdraw::rect_filled( swatch_rect.m_x, swatch_rect.m_y, swatch_rect.m_w, swatch_rect.m_h, bg_col, detail::g_ctx.m_style.color_picker_swatch_rounding );
 
 		constexpr auto checker_size = 4.0f;
 		for ( float y = 0; y < swatch_size; y += checker_size )
@@ -1564,12 +1553,12 @@ namespace zui {
 			{
 				const auto is_dark = ( static_cast< int >( x / checker_size ) + static_cast< int >( y / checker_size ) ) % 2 == 0;
 				const auto checker_col = is_dark ? zdraw::rgba{ 180, 180, 180, 255 } : zdraw::rgba{ 220, 220, 220, 255 };
-				zdraw::rect_filled( swatch_rect.m_x + x, swatch_rect.m_y + y, std::min( checker_size, swatch_size - x ), std::min( checker_size, swatch_size - y ), checker_col );
+				zdraw::rect_filled( swatch_rect.m_x + x, swatch_rect.m_y + y, std::min( checker_size, swatch_size - x ), std::min( checker_size, swatch_size - y ), checker_col, 0.0f );
 			}
 		}
 
-		zdraw::rect_filled( swatch_rect.m_x, swatch_rect.m_y, swatch_rect.m_w, swatch_rect.m_h, color );
-		zdraw::rect( swatch_rect.m_x, swatch_rect.m_y, swatch_rect.m_w, swatch_rect.m_h, border_col, 1.0f );
+		zdraw::rect_filled( swatch_rect.m_x, swatch_rect.m_y, swatch_rect.m_w, swatch_rect.m_h, color, detail::g_ctx.m_style.color_picker_swatch_rounding );
+		zdraw::rect( swatch_rect.m_x, swatch_rect.m_y, swatch_rect.m_w, swatch_rect.m_h, border_col, detail::g_ctx.m_style.color_picker_swatch_rounding );
 
 		if ( has_label )
 		{

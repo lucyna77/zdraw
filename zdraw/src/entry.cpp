@@ -249,15 +249,15 @@ namespace nmenu {
 						static bool test1 = false;
 						zui::checkbox( "option", test1 );
 
-						zui::same_line( );
+						//zui::same_line( );
 
-						static zdraw::rgba color{ 255, 0, 0, 255 };
-						zui::color_picker( "", color, zui::get_content_region_avail( ).first );
+						//static zdraw::rgba color{ 255, 0, 0, 255 };
+						//zui::color_picker( "", color, zui::get_content_region_avail( ).first );
 
-						zui::new_line( );
+						//zui::new_line( );
 
 						static bool test2 = false;
-						zui::checkbox( "option", test2 );
+						zui::checkbox( "option 2", test2 );
 
 						static int value1 = 50;
 						zui::slider_int( "int", value1, 0, 100 );
@@ -387,6 +387,9 @@ int WINAPI wWinMain( HINSTANCE instance_handle, HINSTANCE, PWSTR, int )
 
 		zdraw::begin_frame( );
 		{
+			const auto fps_text{ std::format( "{:.0f} fps", zdraw::get_framerate( ) ) };
+			zdraw::text( 10.0f, 10.0f, fps_text, zdraw::rgba( 255, 255, 255, 255 ) );
+
 			nmenu::draw( );
 		}
 		zdraw::end_frame( );
