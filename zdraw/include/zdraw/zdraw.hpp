@@ -256,6 +256,9 @@ namespace zdraw
 	[[nodiscard]] font* get_font( ) noexcept;
 	[[nodiscard]] font* get_default_font( ) noexcept;
 
+	[[nodiscard]] float get_delta_time( ) noexcept;
+	[[nodiscard]] float get_framerate( ) noexcept;
+
 	void push_font( font* f );
 	void pop_font( );
 

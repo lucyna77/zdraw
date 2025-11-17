@@ -189,6 +189,13 @@ namespace zdraw {
 			std::uint32_t m_frame_vertex_count{ 0 };
 			std::uint32_t m_frame_index_count{ 0 };
 			std::uint32_t m_buffer_resize_count{ 0 };
+
+			LARGE_INTEGER m_performance_frequency{};
+			LARGE_INTEGER m_last_frame_time{};
+			float m_delta_time{ 0.0f };
+			float m_framerate{ 0.0f };
+
+			static constexpr float k_framerate_smoothing{ 0.1f };
 		};
 
 		struct constant_buffer_data
@@ -1282,14 +1289,13 @@ namespace zdraw {
 		}
 
 		detail::g_render.m_current_draw_list.reserve( 5000u, 10000u, 256u );
-
 		detail::g_render.m_default_font = detail::create_font( { std::span( reinterpret_cast< const std::byte* >( fonts::inter ), sizeof( fonts::inter ) ) }, 13.0f, 512, 512 );
-		if ( !detail::g_render.m_default_font ) [[unlikely]]
-		{
-			return false;
-		}
-
 		detail::g_render.m_font_stack.push_back( detail::g_render.m_default_font );
+
+		QueryPerformanceFrequency( &detail::g_render.m_performance_frequency );
+		QueryPerformanceCounter( &detail::g_render.m_last_frame_time );
+		detail::g_render.m_delta_time = 0.0f;
+		detail::g_render.m_framerate = 0.0f;
 
 		return true;
 	}
@@ -1297,6 +1303,19 @@ namespace zdraw {
 	void begin_frame( )
 	{
 		auto& d{ detail::g_render };
+
+		LARGE_INTEGER current_time{};
+		QueryPerformanceCounter( &current_time );
+
+		const auto delta_ticks{ current_time.QuadPart - d.m_last_frame_time.QuadPart };
+		d.m_delta_time = static_cast< float >( delta_ticks ) / static_cast< float >( d.m_performance_frequency.QuadPart );
+		d.m_last_frame_time = current_time;
+
+		if ( d.m_delta_time > 0.0f )
+		{
+			const auto instantaneous_fps{ 1.0f / d.m_delta_time };
+			d.m_framerate = d.m_framerate * ( 1.0f - d.k_framerate_smoothing ) + instantaneous_fps * d.k_framerate_smoothing;
+		}
 
 		d.m_current_draw_list.clear( );
 		d.m_state_cache.reset_frame( );
@@ -1525,11 +1544,6 @@ namespace zdraw {
 		return add_font_from_memory( buffer, size_pixels, atlas_width, atlas_height );
 	}
 
-	font* get_default_font( ) noexcept
-	{
-		return detail::g_render.m_default_font;
-	}
-
 	font* get_font( ) noexcept
 	{
 		if ( detail::g_render.m_font_stack.empty( ) ) [[unlikely]]
@@ -1538,6 +1552,21 @@ namespace zdraw {
 		}
 
 		return detail::g_render.m_font_stack.back( );
+	}	
+	
+	font* get_default_font( ) noexcept
+	{
+		return detail::g_render.m_default_font;
+	}
+
+	float get_delta_time( ) noexcept
+	{
+		return detail::g_render.m_delta_time;
+	}
+
+	float get_framerate( ) noexcept
+	{
+		return detail::g_render.m_framerate;
 	}
 
 	void push_font( font* f )
