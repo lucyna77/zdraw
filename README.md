@@ -1,4 +1,9 @@
-# features
+### examples using style presets
+<p align="center">
+  <img src="https://i.imgur.com/ngOWYoZ.png" alt="1" width="45%"/>
+  <img src="https://i.imgur.com/WYPowyw.png" alt="2" width="45%"/>
+  <img src="https://i.imgur.com/4SkVdrP.png" alt="3" width="45%"/>
+</p>
 
 ### zdraw (rendering)
 - 2d primitives (lines, rectangles, circles, polygons, etc)
@@ -15,34 +20,7 @@
 - styling system with color presets
 - animations and hover effects
 
-## example usage
-```cpp
-zdraw::initialize( device, context );
-zui::initialize( hwnd );
-
-zdraw::begin_frame( );
-zui::begin( );
-
-static float x = 100, y = 100, w = 400, h = 500;
-if ( zui::begin_window( "window", x, y, w, h, true ) )
-{
-    static bool bool_value = false;
-    zui::checkbox( "checkbox", bool_value );
-    
-    static int int_value = 50;
-    zui::slider_int( "int slider", int_value, 1, 100 );
-    
-    if ( zui::button( "button", 200, 30 ) ) { }
-    
-    zui::end_window( );
-}
-
-zui::end( );
-zdraw::end_frame( );
-```
-
-## dependencies
+### dependencies
 - directx11
 - stb_truetype
 - stb_image
-##
