@@ -14,7 +14,7 @@
 #include <include/zdraw/external/stb/truetype.hpp>
 #include <include/zdraw/external/stb/image.hpp>
 #include <include/zdraw/external/fonts/pixter.hpp>
-#include <include/zdraw/external/fonts/roboto.hpp>
+#include <include/zdraw/external/fonts/inter.hpp>
 #include <include/zdraw/external/shaders/shaders.hpp>
 
 #pragma comment(lib, "d3d11.lib")
@@ -279,7 +279,7 @@ namespace zdraw {
 			}
 
 			D3D11_SAMPLER_DESC sampler_desc{};
-			sampler_desc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+			sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 			sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 			sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 			sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -1283,10 +1283,8 @@ namespace zdraw {
 
 		detail::g_render.m_current_draw_list.reserve( 5000u, 10000u, 256u );
 
-		const auto font_span{ std::span( reinterpret_cast< const std::byte* >( fonts::pixter ), sizeof( fonts::pixter ) ) };
-		detail::g_render.m_default_font = detail::create_font( font_span, 13.0f, 512, 512 );
-
-		if ( detail::g_render.m_default_font == nullptr ) [[unlikely]]
+		detail::g_render.m_default_font = detail::create_font( { std::span( reinterpret_cast< const std::byte* >( fonts::inter ), sizeof( fonts::inter ) ) }, 13.0f, 512, 512 );
+		if ( !detail::g_render.m_default_font ) [[unlikely]]
 		{
 			return false;
 		}
@@ -1412,21 +1410,26 @@ namespace zdraw {
 
 	std::pair<int, int> get_display_size( ) noexcept
 	{
-		auto& d{ detail::g_render };
+		static std::pair<int, int> cached_size = [ ]( ) -> std::pair<int, int>
+			{
+				auto& d{ detail::g_render };
 
-		D3D11_VIEWPORT viewport{};
-		UINT num_viewports{ 1u };
-		if ( d.m_context )
-		{
-			d.m_context->RSGetViewports( &num_viewports, &viewport );
-		}
+				D3D11_VIEWPORT viewport{};
+				UINT num_viewports{ 1u };
+				if ( d.m_context )
+				{
+					d.m_context->RSGetViewports( &num_viewports, &viewport );
+				}
 
-		if ( num_viewports > 0 && viewport.Width > 0.0f && viewport.Height > 0.0f )
-		{
-			return { static_cast< int >( std::lround( viewport.Width ) ), static_cast< int >( std::lround( viewport.Height ) ) };
-		}
+				if ( num_viewports > 0 && viewport.Width > 0.0f && viewport.Height > 0.0f )
+				{
+					return { static_cast< int >( std::lround( viewport.Width ) ), static_cast< int >( std::lround( viewport.Height ) ) };
+				}
 
-		return { GetSystemMetrics( SM_CXSCREEN ), GetSystemMetrics( SM_CYSCREEN ) };
+				return { GetSystemMetrics( SM_CXSCREEN ), GetSystemMetrics( SM_CYSCREEN ) };
+			}( );
+
+		return cached_size;
 	}
 
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> load_texture_from_memory( std::span<const std::byte> data, int* out_width, int* out_height )

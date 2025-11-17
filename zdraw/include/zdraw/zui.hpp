@@ -168,8 +168,8 @@ namespace zui {
 	{
 		dark_blue,
 		light_pink,
-		mint_green,
-		dark_white_accent,
+		dark_white,
+		dark_pink,
 		pastel_lavender,
 		pastel_peach,
 		pastel_sky

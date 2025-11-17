@@ -362,7 +362,10 @@ namespace zui {
 						zdraw::rect_filled( item_rect.m_x, item_rect.m_y, item_rect.m_w, item_rect.m_h, hover_col );
 					}
 
-					zdraw::text( dropdown_rect.m_x + style.frame_padding_x + 4.0f, dropdown_rect.m_y + item_y_offset + 3.0f, popup.item_strings[ i ].c_str( ), style.text );
+					auto [text_w, text_h] = zdraw::measure_text( popup.item_strings[ i ] );
+					const auto text_x = dropdown_rect.m_x + style.frame_padding_x + 4.0f;
+					const auto text_y = dropdown_rect.m_y + item_y_offset + ( item_height - text_h ) * 0.5f;
+					zdraw::text( text_x, text_y, popup.item_strings[ i ].c_str( ), style.text );
 
 					if ( item_hovered && detail::g_ctx.m_input.m_clicked )
 					{
@@ -786,7 +789,8 @@ namespace zui {
 			zdraw::rect( gap_start, text_y, gap_end - gap_start, title_h, border_col );
 
 			std::string title_str( title.begin( ), title.end( ) );
-			zdraw::text( text_x, text_y + 2.0f, title_str, detail::g_ctx.m_style.group_box_title_text );
+			const auto text_actual_y = text_y + ( title_h - title_h_measured ) * 0.5f;
+			zdraw::text( text_x, text_actual_y, title_str, detail::g_ctx.m_style.group_box_title_text );
 		}
 		else
 		{
@@ -1039,11 +1043,13 @@ namespace zui {
 		if ( !label.empty( ) )
 		{
 			const auto text_x = abs.m_x + abs.m_w + detail::g_ctx.m_style.item_spacing_x;
-			const auto text_y = abs.m_y + ( check_size - 12.0f ) * 0.5f;
+			auto [label_w, label_h] = zdraw::measure_text( label );
+			const auto text_y = abs.m_y + ( check_size - label_h ) * 0.5f;
 
 			std::string s( label.begin( ), label.end( ) );
 			zdraw::text( text_x, text_y, s, detail::g_ctx.m_style.text );
 		}
+
 
 		return changed;
 	}
@@ -1075,7 +1081,7 @@ namespace zui {
 		{
 			auto [label_w, label_h] = zdraw::measure_text( label );
 			const auto text_x = abs.m_x + ( abs.m_w - label_w ) * 0.5f;
-			const auto text_y = abs.m_y + ( abs.m_h - label_h ) * 0.5f + 3.0f;
+			const auto text_y = abs.m_y + ( abs.m_h - label_h ) * 0.5f;
 
 			std::string label_str( label.begin( ), label.end( ) );
 			zdraw::text( text_x, text_y, label_str, detail::g_ctx.m_style.text );
@@ -1199,7 +1205,7 @@ namespace zui {
 
 		const auto text_x = button_rect.m_x + ( button_rect.m_w - button_text_w ) * 0.5f;
 		const auto text_y = button_rect.m_y + ( button_rect.m_h - button_text_h ) * 0.5f;
-		zdraw::text( text_x, text_y + 3.5f, button_text, detail::g_ctx.m_style.text );
+		zdraw::text( text_x, text_y, button_text, detail::g_ctx.m_style.text );
 
 		if ( !label.empty( ) )
 		{
@@ -1207,7 +1213,7 @@ namespace zui {
 			const auto label_y = button_rect.m_y + ( button_height - label_h ) * 0.5f;
 
 			std::string label_str( label.begin( ), label.end( ) );
-			zdraw::text( label_x, label_y + 3.5f, label_str, detail::g_ctx.m_style.text );
+			zdraw::text( label_x, label_y, label_str, detail::g_ctx.m_style.text );
 		}
 
 		if ( is_waiting )
@@ -1300,12 +1306,13 @@ namespace zui {
 
 		const auto text_height = std::max( label_h, value_h );
 		const auto slider_height = detail::g_ctx.m_style.slider_height;
-		const auto total_height = text_height + slider_height - 2.0f;
+		const auto spacing = detail::g_ctx.m_style.item_spacing_y * 0.25f;
+		const auto total_height = text_height + spacing + slider_height;
 
 		auto local = detail::item_add( slider_width, total_height );
 		auto abs = detail::item_rect_abs( local );
 
-		const auto frame_y = abs.m_y + text_height - 2.0f;
+		const auto frame_y = abs.m_y + text_height + spacing;
 		const auto frame_rect = rect{ abs.m_x, frame_y, slider_width, slider_height };
 
 		const auto hovered = detail::mouse_in_rect( frame_rect );
@@ -1406,7 +1413,8 @@ namespace zui {
 		}
 
 		const auto combo_height = detail::g_ctx.m_style.combo_height;
-		const auto total_height = label_h + combo_height - 2.0f;
+		const auto spacing = detail::g_ctx.m_style.item_spacing_y * 0.25f;
+		const auto total_height = label_h + spacing + combo_height;
 
 		auto local = detail::item_add( width, total_height );
 		auto abs = detail::item_rect_abs( local );
@@ -1417,7 +1425,7 @@ namespace zui {
 			zdraw::text( abs.m_x, abs.m_y, label_str, detail::g_ctx.m_style.text );
 		}
 
-		const auto button_y = abs.m_y + label_h - 2.0f;
+		const auto button_y = abs.m_y + label_h + spacing;
 		const auto button_rect = rect{ abs.m_x, button_y, width, combo_height };
 		const auto hovered = detail::mouse_in_rect( button_rect );
 
@@ -1451,8 +1459,11 @@ namespace zui {
 		zdraw::rect( button_rect.m_x, button_rect.m_y, button_rect.m_w, button_rect.m_h, border_col, 1.0f );
 
 		const auto current_text = ( current_item >= 0 && current_item < items_count ) ? items[ current_item ] : "";
+		auto [text_w, text_h] = zdraw::measure_text( current_text );
 		const auto text_padding = detail::g_ctx.m_style.frame_padding_x;
-		zdraw::text( button_rect.m_x + text_padding, button_rect.m_y + 3.0f, current_text, detail::g_ctx.m_style.text );
+		const auto text_x = button_rect.m_x + text_padding;
+		const auto text_y = button_rect.m_y + ( combo_height - text_h ) * 0.5f;
+		zdraw::text( text_x, text_y, current_text, detail::g_ctx.m_style.text );
 
 		const auto arrow_size = 6.0f;
 		const auto arrow_x = button_rect.m_x + button_rect.m_w - arrow_size - detail::g_ctx.m_style.frame_padding_x - 4.0f;
@@ -1566,7 +1577,7 @@ namespace zui {
 			const auto text_y = abs.m_y + ( total_h - label_h ) * 0.5f;
 
 			std::string label_str( label.begin( ), label.end( ) );
-			zdraw::text( text_x, text_y + 3.5f, label_str, detail::g_ctx.m_style.text );
+			zdraw::text( text_x, text_y, label_str, detail::g_ctx.m_style.text );
 		}
 
 		if ( is_open )
@@ -1682,41 +1693,7 @@ namespace zui {
 			s.text = { 80, 60, 70, 255 };
 			break;
 
-		case color_preset::mint_green:
-			s.window_bg = { 22, 28, 26, 255 };
-			s.window_border = { 75, 110, 95, 255 };
-			s.nested_bg = { 26, 32, 30, 255 };
-			s.nested_border = { 85, 120, 105, 255 };
-			s.group_box_bg = { 28, 34, 32, 255 };
-			s.group_box_border = { 80, 115, 100, 255 };
-			s.group_box_title_text = { 200, 230, 220, 255 };
-			s.checkbox_bg = { 30, 38, 34, 255 };
-			s.checkbox_border = { 80, 115, 100, 255 };
-			s.checkbox_check = { 130, 230, 190, 255 };
-			s.slider_bg = { 30, 38, 34, 255 };
-			s.slider_border = { 80, 115, 100, 255 };
-			s.slider_fill = { 130, 230, 190, 255 };
-			s.slider_grab = { 150, 240, 200, 255 };
-			s.slider_grab_active = { 170, 250, 210, 255 };
-			s.button_bg = { 40, 50, 45, 255 };
-			s.button_border = { 95, 130, 115, 255 };
-			s.button_hovered = { 55, 70, 62, 255 };
-			s.button_active = { 30, 40, 35, 255 };
-			s.keybind_bg = { 30, 38, 34, 255 };
-			s.keybind_border = { 80, 115, 100, 255 };
-			s.keybind_waiting = { 130, 230, 190, 255 };
-			s.combo_bg = { 30, 38, 34, 255 };
-			s.combo_border = { 80, 115, 100, 255 };
-			s.combo_arrow = { 130, 230, 190, 255 };
-			s.combo_hovered = { 55, 70, 62, 255 };
-			s.combo_popup_bg = { 26, 32, 30, 255 };
-			s.combo_popup_border = { 95, 130, 115, 255 };
-			s.combo_item_hovered = { 55, 70, 62, 255 };
-			s.combo_item_selected = { 130, 230, 190, 50 };
-			s.text = { 215, 235, 225, 255 };
-			break;
-
-		case color_preset::dark_white_accent:
+		case color_preset::dark_white:
 			s.window_bg = { 20, 20, 20, 255 };
 			s.window_border = { 70, 70, 70, 255 };
 			s.nested_bg = { 25, 25, 25, 255 };
@@ -1748,6 +1725,40 @@ namespace zui {
 			s.combo_item_hovered = { 60, 60, 60, 255 };
 			s.combo_item_selected = { 255, 255, 255, 50 };
 			s.text = { 240, 240, 240, 255 };
+			break;
+
+		case color_preset::dark_pink:
+			s.window_bg = { 18, 16, 19, 255 };
+			s.window_border = { 70, 70, 70, 255 };
+			s.nested_bg = { 23, 21, 24, 255 };
+			s.nested_border = { 80, 80, 80, 255 };
+			s.group_box_bg = { 25, 23, 26, 255 };
+			s.group_box_border = { 75, 75, 75, 255 };
+			s.group_box_title_text = { 230, 200, 215, 255 };
+			s.checkbox_bg = { 30, 28, 31, 255 };
+			s.checkbox_border = { 75, 75, 75, 255 };
+			s.checkbox_check = { 220, 160, 190, 255 };
+			s.slider_bg = { 30, 28, 31, 255 };
+			s.slider_border = { 75, 75, 75, 255 };
+			s.slider_fill = { 220, 160, 190, 255 };
+			s.slider_grab = { 230, 180, 205, 255 };
+			s.slider_grab_active = { 210, 140, 175, 255 };
+			s.button_bg = { 40, 35, 38, 255 };
+			s.button_border = { 90, 90, 90, 255 };
+			s.button_hovered = { 50, 42, 48, 255 };
+			s.button_active = { 35, 30, 33, 255 };
+			s.keybind_bg = { 30, 28, 31, 255 };
+			s.keybind_border = { 75, 75, 75, 255 };
+			s.keybind_waiting = { 220, 160, 190, 255 };
+			s.combo_bg = { 30, 28, 31, 255 };
+			s.combo_border = { 75, 75, 75, 255 };
+			s.combo_arrow = { 220, 160, 190, 255 };
+			s.combo_hovered = { 50, 42, 48, 255 };
+			s.combo_popup_bg = { 23, 21, 24, 255 };
+			s.combo_popup_border = { 90, 90, 90, 255 };
+			s.combo_item_hovered = { 50, 42, 48, 255 };
+			s.combo_item_selected = { 220, 160, 190, 40 };
+			s.text = { 235, 220, 230, 255 };
 			break;
 
 		case color_preset::pastel_lavender:
