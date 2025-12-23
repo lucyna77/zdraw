@@ -19,8 +19,8 @@
 #include "external/stb/truetype.hpp"
 #include "external/unordered_dense.hpp"
 
-namespace zdraw
-{
+namespace zdraw {
+
 	struct font;
 	struct font_atlas;
 
@@ -177,20 +177,23 @@ namespace zdraw
 		void ensure_draw_cmd( ID3D11ShaderResourceView* texture );
 
 		void add_line( float x0, float y0, float x1, float y1, rgba color, float thickness = 1.0f );
-		void add_rect( float x, float y, float w, float h, rgba color, float rounding = 0.0f, float thickness = 1.0f );
+		void add_rect( float x, float y, float w, float h, rgba color, float thickness = 1.0f );
 		void add_rect_cornered( float x, float y, float w, float h, rgba color, float corner_length, float thickness );
-		void add_rect_filled( float x, float y, float w, float h, rgba color, float rounding = 0.0f );
-		void add_rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl, float rounding = 0.0f );
-		void add_rect_textured( float x, float y, float w, float h, ID3D11ShaderResourceView* tex, float u0 = 0.0f, float v0 = 0.0f, float u1 = 1.0f, float v1 = 1.0f );
+		void add_rect_filled( float x, float y, float w, float h, rgba color );
+		void add_rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl );
+		void add_rect_textured( float x, float y, float w, float h, ID3D11ShaderResourceView* tex, float u0 = 0.0f, float v0 = 0.0f, float u1 = 1.0f, float v1 = 1.0f, rgba color = rgba{ 255, 255, 255, 255 } );
 		void add_convex_poly_filled( std::span<const float> points, rgba color );
 		void add_polyline( std::span<const float> points, rgba color, bool closed = false, float thickness = 1.0f );
+		void add_polyline_multi_color( std::span<const float> points, std::span<const rgba> colors, bool closed = false, float thickness = 1.0f );
 		void add_triangle( float x0, float y0, float x1, float y1, float x2, float y2, rgba color, float thickness = 1.0f );
 		void add_triangle_filled( float x0, float y0, float x1, float y1, float x2, float y2, rgba color );
+		void add_triangle_filled_multi_color( float x0, float y0, float x1, float y1, float x2, float y2, rgba color0, rgba color1, rgba color2 );
 		void add_circle( float x, float y, float radius, rgba color, int segments = 32, float thickness = 1.0f );
 		void add_circle_filled( float x, float y, float radius, rgba color, int segments = 32 );
 		void add_arc( float x, float y, float radius, float start_angle, float end_angle, rgba color, int segments = 32, float thickness = 1.0f );
 		void add_arc_filled( float x, float y, float radius, float start_angle, float end_angle, rgba color, int segments = 32 );
 		void add_text( float x, float y, std::string_view text, const font* font, rgba color );
+		void add_text_multi_color( float x, float y, std::string_view text, const font* f, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl );
 	};
 
 	struct font_atlas
@@ -223,7 +226,19 @@ namespace zdraw
 		float m_descent{ 0.0f };
 		float m_line_gap{ 0.0f };
 		float m_line_height{ 0.0f };
-		std::unique_ptr<stbtt_packedchar[ ]> m_packed_char_data{};
+
+		struct freetype_glyph_info
+		{
+			float m_advance_x{ 0.0f };
+			float m_bearing_x{ 0.0f };
+			float m_bearing_y{ 0.0f };
+			float m_width{ 0.0f };
+			float m_height{ 0.0f };
+			float m_atlas_x{ 0.0f };
+			float m_atlas_y{ 0.0f };
+		};
+
+		std::array<freetype_glyph_info, 95> m_glyph_info{};
 
 		struct string_hash
 		{
@@ -236,12 +251,6 @@ namespace zdraw
 
 		mutable ankerl::unordered_dense::map<char, glyph_cache_entry> m_glyph_cache{};
 		mutable ankerl::unordered_dense::map<std::string, std::pair<float, float>, string_hash, std::equal_to<>> m_text_size_cache{};
-
-		font( ) = default;
-		font( const font& ) = delete;
-		font& operator=( const font& ) = delete;
-		font( font&& ) = default;
-		font& operator=( font&& ) = default;
 
 		[[nodiscard]] const glyph_cache_entry& get_glyph( char c ) const;
 		void calc_text_size( std::string_view text, float& width, float& height ) const;
@@ -264,6 +273,7 @@ namespace zdraw
 	[[nodiscard]] std::pair<int, int> get_display_size( ) noexcept;
 
 	[[nodiscard]] Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> load_texture_from_memory( std::span<const std::byte> data, int* out_width = nullptr, int* out_height = nullptr );
+	[[nodiscard]] Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> load_icon_from_memory( std::span<const std::byte> data, int* out_width = nullptr, int* out_height = nullptr );
 	[[nodiscard]] Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> load_texture_from_file( std::string_view filepath, int* out_width = nullptr, int* out_height = nullptr );
 
 	[[nodiscard]] font* add_font_from_memory( std::span<const std::byte> font_data, float size_pixels, int atlas_width = 512, int atlas_height = 512 );
@@ -281,15 +291,17 @@ namespace zdraw
 	void pop_clip_rect( );
 
 	void line( float x0, float y0, float x1, float y1, rgba color, float thickness = 1.0f );
-	void rect( float x, float y, float w, float h, rgba color, float rounding = 0.0f, float thickness = 1.0f );
+	void rect( float x, float y, float w, float h, rgba color, float thickness = 1.0f );
 	void rect_cornered( float x, float y, float w, float h, rgba color, float corner_length = 15.0f, float thickness = 1.0f );
-	void rect_filled( float x, float y, float w, float h, rgba color, float rounding = 0.0f );
-	void rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl, float rounding = 0.0f );
-	void rect_textured( float x, float y, float w, float h, ID3D11ShaderResourceView* tex, float u0 = 0.0f, float v0 = 0.0f, float u1 = 1.0f, float v1 = 1.0f );
+	void rect_filled( float x, float y, float w, float h, rgba color );
+	void rect_filled_multi_color( float x, float y, float w, float h, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl );
+	void rect_textured( float x, float y, float w, float h, ID3D11ShaderResourceView* tex, float u0 = 0.0f, float v0 = 0.0f, float u1 = 1.0f, float v1 = 1.0f, rgba color = rgba{ 255, 255, 255, 255 } );
 	void convex_poly_filled( std::span<const float> points, rgba color );
 	void polyline( std::span<const float> points, rgba color, bool closed = false, float thickness = 1.0f );
+	void polyline_multi_color( std::span<const float> points, std::span<const rgba> colors, bool closed = false, float thickness = 1.0f );
 	void triangle( float x0, float y0, float x1, float y1, float x2, float y2, rgba color, float thickness = 1.0f );
 	void triangle_filled( float x0, float y0, float x1, float y1, float x2, float y2, rgba color );
+	void triangle_filled_multi_color( float x0, float y0, float x1, float y1, float x2, float y2, rgba color0, rgba color1, rgba color2 );
 	void circle( float x, float y, float radius, rgba color, int segments = 32, float thickness = 1.0f );
 	void circle_filled( float x, float y, float radius, rgba color, int segments = 32 );
 	void arc( float x, float y, float radius, float start_angle, float end_angle, rgba color, int segments = 32, float thickness = 1.0f );
@@ -310,7 +322,7 @@ namespace zdraw
 
 			for ( int i{ 0 }; i < 4; ++i )
 			{
-				get_draw_list( ).add_text( x + offsets[ i ][ 0 ], y + offsets[ i ][ 1 ], str, f, rgba( 0, 0, 0, 235 ) );
+				get_draw_list( ).add_text( x + offsets[ i ][ 0 ], y + offsets[ i ][ 1 ], str, f, rgba( 0, 0, 0, color.a ) );
 			}
 
 			get_draw_list( ).add_text( x, y, str, f, color );
@@ -319,7 +331,7 @@ namespace zdraw
 		{
 			constexpr float offset{ 1.0f };
 
-			get_draw_list( ).add_text( x + offset, y + offset, str, f, rgba( 0, 0, 0, 235 ) );
+			get_draw_list( ).add_text( x + offset, y + offset, str, f, rgba( 0, 0, 0, color.a ) );
 			get_draw_list( ).add_text( x, y, str, f, color );
 		}
 		else
@@ -328,6 +340,7 @@ namespace zdraw
 		}
 	}
 
+	void text_multi_color( float x, float y, std::string_view text, rgba color_tl, rgba color_tr, rgba color_br, rgba color_bl, const font* fnt = nullptr );
 	[[nodiscard]] std::pair<float, float> measure_text( std::string_view text, const font* fnt = nullptr );
 
 } // namespace zdraw
