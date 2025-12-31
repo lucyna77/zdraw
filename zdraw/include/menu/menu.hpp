@@ -1,6 +1,8 @@
 #ifndef MENU_HPP
 #define MENU_HPP
 
+#include "resources/background.hpp"
+
 namespace menu {
 
 	inline zscene::scene demo_scene{};

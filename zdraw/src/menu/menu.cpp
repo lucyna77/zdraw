@@ -23,6 +23,14 @@ namespace menu {
 		zui::begin( );
 
 		{
+			static auto background = zdraw::load_texture_from_memory( { std::span( reinterpret_cast< const std::byte* >( resources::background ), sizeof( resources::background ) ) } );
+			if ( background )
+			{
+				zdraw::rect_textured( 0, 0, 1280, 720, background.Get( ) );
+			}
+		}
+
+		{
 			static auto win_x = 50.0f, win_y = 50.0f;
 			static auto win_w = 500.0f, win_h = 500.0f;
 

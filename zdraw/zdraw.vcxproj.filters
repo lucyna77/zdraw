@@ -282,6 +282,9 @@
     <ClInclude Include="include\zdraw\zscene\core\renderer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\menu\resources\background.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\menu\menu.cpp">
